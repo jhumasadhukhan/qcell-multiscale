@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+.DS_Store
+.pytest_cache/
+
+# generated outputs: reproducible with ./reproduce.sh
+figures/*.png
+*.pdf

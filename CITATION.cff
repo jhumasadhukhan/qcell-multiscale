@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+title: "QCell: a quantum-to-cellular multiscale model of an intracellular biosensor"
+message: "If you use this software, please cite both the software and the paper."
+type: software
+authors:
+  - family-names: Sadhukhan
+    given-names: Jhuma
+    affiliation: "University of Surrey"
+    email: j.sadhukhan@surrey.ac.uk
+repository-code: "https://github.com/jhumasadhukhan/qcell-multiscale"
+license: MIT
+version: "1.0.0"
+date-released: "2026-11-18"
+abstract: >-
+  Reference implementation coupling a first-principles excitonic layer
+  (electronic coupling, orientation factor, cytoplasmic refractive index and
+  band-resolved optical transport) to a dynamic model of polyhydroxyalkanoate
+  fermentation fed with bioelectrochemical formate. Demonstrates that a
+  ratiometric FRET readout is not self-calibrating in a granule-accumulating
+  culture, and supplies the correction.
+keywords:
+  - multiscale modelling
+  - FRET biosensor
+  - polyhydroxyalkanoate
+  - bioprocess control
+  - Foerster resonance energy transfer
+preferred-citation:
+  type: article
+  title: "Polymer accumulation biases the intracellular biosensor used to control it"
+  authors:
+    - family-names: Sadhukhan
+      given-names: Jhuma
+  year: 2026

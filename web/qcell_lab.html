@@ -1,0 +1,860 @@
+<title>QCell Multiscale Lab</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: instrument panel — fixed control rail at left, plot grid at right.
+   Palette taken from the sensor's own emission bands: donor 480 nm cyan,
+   acceptor 530 nm yellow-green, against a cool slate ground. */
+:root{
+  --bg:#f4f6f7; --panel:#ffffff; --ink:#15232b; --muted:#5f7380; --line:#d3dde2;
+  --donor:#0b7f93; --acceptor:#c89117; --warn:#bb3b52; --ok:#2f7d55;
+  --grid:#e3eaee; --rail:#eef2f4;
+  --font-ui:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1619; --panel:#152127; --ink:#e3edf1; --muted:#90a6b1; --line:#27373f;
+  --donor:#3fc3d8; --acceptor:#f0bb4e; --warn:#ef7389; --ok:#5fc48e;
+  --grid:#1d2c33; --rail:#121d22; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0e1619; --panel:#152127; --ink:#e3edf1; --muted:#90a6b1; --line:#27373f;
+  --donor:#3fc3d8; --acceptor:#f0bb4e; --warn:#ef7389; --ok:#5fc48e;
+  --grid:#1d2c33; --rail:#121d22; color-scheme:dark;}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);margin:0;
+  padding-block:0;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:16px;padding-block:22px 40px}
+
+header.top{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;
+  justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:14px}
+h1{font-size:1.32rem;font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);font-size:.84rem;margin:4px 0 0;max-width:62ch}
+.badge{font-family:var(--font-mono);font-size:.68rem;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--muted);border:1px solid var(--line);
+  border-radius:3px;padding:3px 7px}
+
+.layout{display:grid;grid-template-columns:272px minmax(0,1fr);gap:18px;margin-top:18px}
+@media (max-width:860px){.layout{grid-template-columns:1fr}}
+
+.rail{background:var(--rail);border:1px solid var(--line);border-radius:6px;
+  padding:14px;align-self:start;display:flex;flex-direction:column;gap:14px;min-width:0}
+.group{display:flex;flex-direction:column;gap:9px}
+.group > h3{font-family:var(--font-mono);font-size:.67rem;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);margin:0;padding-bottom:5px;
+  border-bottom:1px solid var(--line)}
+.ctl{display:flex;flex-direction:column;gap:3px}
+.ctl label{font-size:.76rem;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.ctl .val{font-family:var(--font-mono);font-size:.74rem;color:var(--donor);
+  font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--donor);margin:0}
+select,button{font-family:var(--font-ui);font-size:.8rem;color:var(--ink);
+  background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:6px 8px}
+button{cursor:pointer;font-weight:500}
+button:hover{border-color:var(--donor)}
+button.primary{background:var(--donor);color:#fff;border-color:var(--donor)}
+button.primary:hover{filter:brightness(1.08)}
+button:focus-visible,select:focus-visible,input:focus-visible,
+.tab:focus-visible{outline:2px solid var(--donor);outline-offset:2px}
+.btnrow{display:flex;gap:7px;flex-wrap:wrap}
+.btnrow button{flex:1 1 auto;min-width:0}
+
+.main{display:flex;flex-direction:column;gap:16px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  padding:14px;min-width:0}
+.card h2{font-size:.92rem;font-weight:600;margin:0 0 3px}
+.card .cap{color:var(--muted);font-size:.76rem;margin:0 0 11px}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:9px}
+.kpi{border:1px solid var(--line);border-radius:5px;padding:9px 10px;min-width:0}
+.kpi .k{font-family:var(--font-mono);font-size:.63rem;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--muted);display:block}
+.kpi .v{font-family:var(--font-mono);font-size:1.12rem;font-weight:600;
+  font-variant-numeric:tabular-nums;display:block;margin-top:2px}
+.kpi .u{font-size:.68rem;color:var(--muted);font-weight:400}
+
+.plots{display:grid;grid-template-columns:repeat(auto-fit,minmax(272px,1fr));gap:13px}
+.plot{min-width:0}
+.plot h4{font-size:.78rem;font-weight:600;margin:0 0 5px;color:var(--ink)}
+canvas{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:4px;
+  background:var(--panel)}
+
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:12px;
+  overflow-x:auto}
+.tab{background:none;border:none;border-bottom:2px solid transparent;border-radius:0;
+  padding:7px 11px;color:var(--muted);font-size:.8rem;white-space:nowrap}
+.tab[aria-selected=true]{color:var(--ink);border-bottom-color:var(--donor);font-weight:600}
+
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+th,td{text-align:left;padding:6px 9px;border-bottom:1px solid var(--line)}
+th{font-family:var(--font-mono);font-size:.65rem;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted);font-weight:500}
+td.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;text-align:right}
+.scroll{overflow-x:auto;min-width:0}
+
+pre{font-family:var(--font-mono);font-size:.7rem;line-height:1.5;margin:0;
+  background:var(--rail);border:1px solid var(--line);border-radius:5px;
+  padding:12px;overflow-x:auto;max-height:460px;color:var(--ink)}
+code{font-family:var(--font-mono);font-size:.86em}
+.note{font-size:.78rem;color:var(--muted);margin:9px 0 0}
+.legend{display:flex;gap:13px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);
+  margin-top:7px}
+.legend i{display:inline-block;width:13px;height:2.5px;vertical-align:middle;
+  margin-right:5px;border-radius:2px}
+.status{font-family:var(--font-mono);font-size:.72rem;color:var(--muted)}
+.eq{font-family:var(--font-mono);font-size:.72rem;color:var(--muted);
+  background:var(--rail);border-left:2px solid var(--donor);padding:7px 10px;
+  border-radius:0 4px 4px 0;margin:9px 0;overflow-x:auto}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div>
+    <h1>QCell Multiscale Lab</h1>
+    <p class="sub">Excitonic FRET biosensing coupled to formate-fed polyhydroxyalkanoate
+    fermentation. The quantum layer is solved as an algebraic constraint inside the
+    cellular integration.</p>
+  </div>
+  <span class="badge" id="runstat">ready</span>
+</header>
+
+<div class="layout">
+  <aside class="rail">
+    <div class="group">
+      <h3>Control strategy</h3>
+      <div class="ctl">
+        <select id="mode">
+          <option value="open">Clock — open loop</option>
+          <option value="closed_raw">Closed — raw ratio</option>
+          <option value="closed_od">Closed — OD-corrected</option>
+          <option value="closed_multiscale" selected>Closed — multiscale</option>
+        </select>
+      </div>
+      <div class="ctl">
+        <label for="gset"><span>2-OG setpoint</span> <span class="val" id="gset_v">0.160</span></label>
+        <input type="range" id="gset" min="0.08" max="0.40" step="0.005" value="0.16">
+      </div>
+      <div class="ctl">
+        <label for="tsw"><span>Clock switch time</span> <span class="val" id="tsw_v">60 h</span></label>
+        <input type="range" id="tsw" min="16" max="72" step="1" value="60">
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Sensor design</h3>
+      <div class="ctl">
+        <label for="kd"><span>K<sub>D</sub></span> <span class="val" id="kd_v">0.200 mM</span></label>
+        <input type="range" id="kd" min="0.02" max="1.2" step="0.01" value="0.20">
+      </div>
+      <div class="ctl">
+        <label for="rholo"><span>R<sub>holo</sub></span> <span class="val" id="rholo_v">46 Å</span></label>
+        <input type="range" id="rholo" min="34" max="64" step="1" value="46">
+      </div>
+      <div class="ctl">
+        <label for="ap"><span>Granule scattering a<sub>P</sub></span> <span class="val" id="ap_v">0.12</span></label>
+        <input type="range" id="ap" min="0" max="0.9" step="0.02" value="0.12">
+      </div>
+      <div class="ctl">
+        <label for="noise"><span>Ratio noise</span> <span class="val" id="noise_v">2.0 %</span></label>
+        <input type="range" id="noise" min="0" max="8" step="0.5" value="2">
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Strain</h3>
+      <div class="ctl">
+        <label for="mu"><span>&mu;<sub>max</sub> scale</span> <span class="val" id="mu_v">1.00×</span></label>
+        <input type="range" id="mu" min="0.7" max="1.3" step="0.02" value="1">
+      </div>
+      <div class="ctl">
+        <label for="mups"><span>PHA rate scale</span> <span class="val" id="mups_v">1.00×</span></label>
+        <input type="range" id="mups" min="0.7" max="1.3" step="0.02" value="1">
+      </div>
+      <div class="ctl">
+        <label for="kis"><span>Formate tolerance</span> <span class="val" id="kis_v">1.00×</span></label>
+        <input type="range" id="kis" min="0.5" max="1.5" step="0.02" value="1">
+      </div>
+    </div>
+
+    <div class="btnrow">
+      <button class="primary" id="run">Run</button>
+      <button id="compare">Compare all</button>
+    </div>
+    <div class="btnrow">
+      <button id="reset">Reset</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section class="card">
+      <h2>Outcome</h2>
+      <p class="cap">Economic objective <code>J = C<sub>P</sub> + 0.35 &phi;<sub>a</sub>C<sub>X</sub></code>
+      at 96 h: harvested polymer plus the value of viable catalyst carried to the next cycle.</p>
+      <div class="kpis" id="kpis"></div>
+    </section>
+
+    <section class="card">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true" data-p="process">Process</button>
+        <button class="tab" role="tab" aria-selected="false" data-p="sensor">Sensor</button>
+        <button class="tab" role="tab" aria-selected="false" data-p="compare">Comparison</button>
+        <button class="tab" role="tab" aria-selected="false" data-p="code">Source</button>
+      </div>
+
+      <div id="p_process">
+        <div class="plots">
+          <div class="plot"><h4>Biomass and polymer</h4><canvas id="c1" width="520" height="260"></canvas>
+            <div class="legend"><span><i style="background:var(--donor)"></i>C<sub>X</sub></span>
+            <span><i style="background:var(--acceptor)"></i>C<sub>P</sub></span>
+            <span><i style="background:var(--ok)"></i>&phi;<sub>a</sub>&times;10</span></div></div>
+          <div class="plot"><h4>Nitrogen and 2-oxoglutarate</h4><canvas id="c2" width="520" height="260"></canvas>
+            <div class="legend"><span><i style="background:var(--donor)"></i>C<sub>N</sub> (g/L)</span>
+            <span><i style="background:var(--acceptor)"></i>G (mM)</span>
+            <span><i style="background:var(--warn)"></i>setpoint</span></div></div>
+          <div class="plot"><h4>Formate and feed</h4><canvas id="c3" width="520" height="260"></canvas>
+            <div class="legend"><span><i style="background:var(--donor)"></i>C<sub>S</sub> (g/L)</span>
+            <span><i style="background:var(--acceptor)"></i>F<sub>N</sub> (mL/h)</span></div></div>
+          <div class="plot"><h4>Granule loading</h4><canvas id="c4" width="520" height="260"></canvas>
+            <div class="legend"><span><i style="background:var(--donor)"></i>&phi;<sub>P</sub></span>
+            <span><i style="background:var(--acceptor)"></i>f<sub>P</sub></span></div></div>
+        </div>
+      </div>
+
+      <div id="p_sensor" hidden>
+        <div class="plots">
+          <div class="plot"><h4>Response curve at three granule loadings</h4>
+            <canvas id="c5" width="520" height="260"></canvas>
+            <div class="legend"><span><i style="background:var(--donor)"></i>&phi;<sub>P</sub>=0</span>
+            <span><i style="background:var(--acceptor)"></i>&phi;<sub>P</sub>=0.15</span>
+            <span><i style="background:var(--warn)"></i>&phi;<sub>P</sub>=0.30</span></div></div>
+          <div class="plot"><h4>Calibration error vs polymer fraction</h4>
+            <canvas id="c6" width="520" height="260"></canvas>
+            <div class="legend"><span><i style="background:var(--warn)"></i>raw ratio</span>
+            <span><i style="background:var(--acceptor)"></i>OD-corrected</span>
+            <span><i style="background:var(--donor)"></i>multiscale</span></div></div>
+          <div class="plot"><h4>Estimator error in the run</h4>
+            <canvas id="c7" width="520" height="260"></canvas></div>
+          <div class="plot"><h4>Förster radius and transmission ratio</h4>
+            <canvas id="c8" width="520" height="260"></canvas>
+            <div class="legend"><span><i style="background:var(--donor)"></i>R<sub>0</sub> (Å)</span>
+            <span><i style="background:var(--acceptor)"></i>T<sub>A</sub>/T<sub>D</sub></span></div></div>
+        </div>
+        <div class="eq" id="photo"></div>
+      </div>
+
+      <div id="p_compare" hidden>
+        <div class="scroll"><table id="cmp"><thead><tr>
+          <th>Strategy</th><th>PHA titre</th><th>f<sub>P</sub></th><th>Biomass</th>
+          <th>&phi;<sub>a</sub></th><th>Est. error</th><th>Objective J</th>
+        </tr></thead><tbody></tbody></table></div>
+        <p class="note">Estimator error is the mean relative error in the inferred 2-oxoglutarate
+        over the accumulation phase. The raw-ratio case trusts the ratio as self-normalising;
+        the OD case corrects for cell density but cannot resolve polymer content; the multiscale
+        case corrects the refractive index, orientation factor and band-resolved transport together.</p>
+      </div>
+
+      <div id="p_code" hidden>
+        <div class="btnrow" style="margin-bottom:10px">
+          <button id="copyjs">Copy JavaScript model</button>
+          <button id="copypy">Copy Python reference</button>
+        </div>
+        <p class="note" id="copystat" style="margin-top:0">The JavaScript below is the running
+        model on this page. The Python reference is the same model written for batch use with
+        the scenario runner.</p>
+        <pre id="src"></pre>
+      </div>
+    </section>
+  </main>
+</div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+   QCELL — quantum-to-cellular multiscale model (JavaScript port)
+   Quantum layer: Coulomb coupling, golden-rule transfer, orientation factor
+   under partial rotational averaging, Lorentz-Lorenz index of a granule-filled
+   cytoplasm, band-resolved optical transport, ratiometric observable.
+   Cellular layer: Nernst-Monod BES formate supply with buffer reservoir,
+   Haldane-gated PHA fermentation, 2-oxoglutarate node, active biomass fraction.
+   ========================================================================= */
+
+const C_LIGHT = 2.99792458e10;          // cm/s
+const F_FAR = 96485.0, R_GAS = 8.314, T_K = 298.15;
+const DIP_PRE = 5034.1;                 // D^2 A^-3 -> cm^-1
+const KB = 1.380649e-23;
+
+const QP0 = {
+  phi_D:0.93, phi_A:0.57, tau_D0:4.0e-9, J_overlap:2.4e15,
+  mu_D:4.37, mu_A:8.86,
+  R_apo:68.0, R_holo:46.0, kappa2_static_apo:0.52, kappa2_static_holo:1.15,
+  K_D:0.20, hill_h:1.15,
+  V_hydro:8.0e-26, eta_cyto0:3.0e-3,
+  n_cytosol:1.360, n_granule:1.490, phi_pack:0.68,
+  alpha_direct:0.085, bleed_DA:0.055, I_exc:1.0, dark:0.004,
+  T2_star:60e-15,
+  lam_D:480.0, lam_A:530.0, lam_ref:500.0, p_mie:1.5,
+  a_X:0.250, a_P:0.120, L_eff:0.30
+};
+
+const CP0 = {
+  mu_xs_max:0.18, mu_xp_max:0.040, mu_ps_max:0.200,
+  Y_xs:0.090, Y_pi:0.100, Y_xp:0.60, Y_xN:8.0, m_s:0.020,
+  K_S:0.10, K_IS:2.00, K_N:0.050, K_IN:10.0, K_P:0.10,
+  K_PS:0.20, K_PIS:2.00, K_PIN:0.020,
+  b_dec0:0.0040, b_decN:0.0900, K_Nv:0.0100,
+  Cx_max:15.0, alpha:1.0, fP_max:0.80, beta:2.0,
+  k_G:1.35, V_GS:2.60, K_G:0.50, K_NG:0.020, G_basal:0.030, k_Gdeg:0.08,
+  k_exp:0.0115, k_bleach:0.004, burden:0.55,
+  C_SF:600.0, C_NF:40.0,
+  rho_P:1.25, rho_R:1.10, rho_cell_wet:1.00, dry_frac:0.30
+};
+
+const BP0 = {
+  K_SD:0.174, E_KA:0.0, V1:0.228, V2:0.0,
+  A_cat:25000.0, FE:0.949, M_w:46.03, n_e:2.0,
+  j_ref:2.6, eta_ref:0.30, S_cod_anode:1.0, M_res0:60.0, M_res_max:400.0
+};
+
+/* ---------------------------------------------------------- quantum layer */
+function lorentzLorenz(phi, nh, ni){
+  const fh=(nh*nh-1)/(nh*nh+2), fi=(ni*ni-1)/(ni*ni+2);
+  const f=(1-phi)*fh+phi*fi;
+  return Math.sqrt((1+2*f)/(1-f));
+}
+function kriegerDougherty(phi, eta0, phimax){
+  const x=Math.min(Math.max(phi/phimax,0),0.95);
+  return eta0*Math.pow(1-x,-2.5*phimax);
+}
+function kappa2Eff(phiP, k2static, qp){
+  const eta=kriegerDougherty(phiP, qp.eta_cyto0, qp.phi_pack);
+  const theta=eta*qp.V_hydro/(KB*T_K);
+  const fdyn=qp.tau_D0/(theta+qp.tau_D0);
+  return (2/3)*fdyn + k2static*(1-fdyn);
+}
+function forsterR0(k2, n, qp){
+  return 0.211*Math.pow(k2*Math.pow(n,-4)*qp.phi_D*qp.J_overlap, 1/6);
+}
+function coulombJ(kappa, R, n, qp){
+  return DIP_PRE*kappa*qp.mu_D*qp.mu_A/(n*n*R*R*R);
+}
+function overlapDensity(qp){
+  const k2=2/3, n=1.33;
+  const R0=forsterR0(k2,n,qp), J0=coulombJ(Math.sqrt(k2),R0,n,qp);
+  return 1/(4*Math.PI*Math.PI*C_LIGHT*J0*J0*qp.tau_D0);
+}
+function eetRate(k2, R, n, qp, Jcal){
+  const J=coulombJ(Math.sqrt(Math.max(k2,1e-12)),R,n,qp);
+  let k=4*Math.PI*Math.PI*C_LIGHT*J*J*Jcal;
+  const wJ=2*Math.PI*C_LIGHT*J, gam=1/qp.T2_star;
+  k=k/(1+Math.pow(2*wJ/gam,2));
+  return [k,J];
+}
+function fretE(k2,R,n,qp,Jcal){
+  const [k]=eetRate(k2,R,n,qp,Jcal);
+  return k/(k+1/qp.tau_D0);
+}
+function occupancy(G,qp){
+  const g=Math.max(G,0);
+  return Math.pow(g,qp.hill_h)/(Math.pow(g,qp.hill_h)+Math.pow(qp.K_D,qp.hill_h));
+}
+function transmission(Cx,Cp,qp){
+  const Cr=Math.max(Cx-Cp,0);
+  const mu=qp.a_X*Cr+(qp.a_X+qp.a_P)*Math.max(Cp,0);
+  const AD=mu*Math.pow(qp.lam_ref/qp.lam_D,qp.p_mie)*qp.L_eff;
+  const AA=mu*Math.pow(qp.lam_ref/qp.lam_A,qp.p_mie)*qp.L_eff;
+  return [Math.exp(-AD),Math.exp(-AA)];
+}
+function quantumMap(G,phiP,qp,Jcal,Cx,Cp){
+  Cx=Cx||0; Cp=Cp||0;
+  const n=lorentzLorenz(phiP,qp.n_cytosol,qp.n_granule);
+  const k2a=kappa2Eff(phiP,qp.kappa2_static_apo,qp);
+  const k2h=kappa2Eff(phiP,qp.kappa2_static_holo,qp);
+  const Ea=fretE(k2a,qp.R_apo,n,qp,Jcal), Eh=fretE(k2h,qp.R_holo,n,qp,Jcal);
+  const th=occupancy(G,qp);
+  const E=(1-th)*Ea+th*Eh;
+  let ID=qp.I_exc*qp.phi_D*(1-E);
+  let IA=qp.I_exc*(qp.phi_A*E+qp.alpha_direct*qp.phi_A+qp.bleed_DA*qp.phi_D*(1-E));
+  const [TD,TA]=transmission(Cx,Cp,qp);
+  ID=ID*TD+qp.dark; IA=IA*TA+qp.dark;
+  return {Rt:IA/ID,E:E,E_apo:Ea,E_holo:Eh,theta:th,n:n,
+          kappa2_holo:k2h,R0_holo:forsterR0(k2h,n,qp),
+          TD:TD,TA:TA,drift:TA/TD};
+}
+function invertMap(Rt,phiP,qp,Jcal,Cx,Cp,level){
+  Cx=Cx||0; Cp=Cp||0;
+  let phiUse,TD,TA;
+  if(level==="full"){ phiUse=phiP; [TD,TA]=transmission(Cx,Cp,qp); }
+  else if(level==="od_only"){ phiUse=0; [TD,TA]=transmission(Cx,0,qp); }
+  else { phiUse=0; TD=1; TA=1; }
+  const Rp=Rt*(TD/TA);
+  const n=lorentzLorenz(phiUse,qp.n_cytosol,qp.n_granule);
+  const k2a=kappa2Eff(phiUse,qp.kappa2_static_apo,qp);
+  const k2h=kappa2Eff(phiUse,qp.kappa2_static_holo,qp);
+  const Ea=fretE(k2a,qp.R_apo,n,qp,Jcal), Eh=fretE(k2h,qp.R_holo,n,qp,Jcal);
+  const a=qp.I_exc;
+  const num=a*qp.phi_A*(1+qp.alpha_direct)+qp.dark*(1-Rp);
+  const den=a*(Rp*qp.phi_D-qp.bleed_DA*qp.phi_D+qp.phi_A);
+  const E=Math.min(Math.max(1-num/den,1e-6),1-1e-6);
+  const th=Math.min(Math.max((E-Ea)/(Eh-Ea),1e-9),1-1e-9);
+  return qp.K_D*Math.pow(th/(1-th),1/qp.hill_h);
+}
+
+/* --------------------------------------------------------- cellular layer */
+function granulePhi(Cx,Cp,cp){
+  Cp=Math.max(Cp,0);
+  const Cr=Math.max(Cx-Cp,1e-9);
+  const vP=Cp/cp.rho_P, vR=(Cr/cp.dry_frac)/cp.rho_cell_wet;
+  return Math.min(Math.max(vP/(vP+vR),0),0.95);
+}
+function inactivation(Cn,cp){ return cp.b_dec0+cp.b_decN*cp.K_Nv/(Cn+cp.K_Nv); }
+function rates(Cs,Cn,Cx,Cp,cp,burden,phi_a){
+  Cx=Math.max(Cx,1e-9);
+  const fP=Math.min(Math.max(Cp/Cx,0),cp.fP_max*0.999);
+  const gS=Cs/(cp.K_S+Cs+Cs*Cs/cp.K_IS);
+  const gN=Cn/(cp.K_N+Cn+Cn*Cn/cp.K_IN);
+  const gX=Math.max(0,1-Math.pow(Cx/cp.Cx_max,cp.alpha));
+  const sc=Math.max(0,1-burden);
+  const mu_xs=cp.mu_xs_max*sc*phi_a*gS*gN*gX;
+  const mu_xp=cp.mu_xp_max*sc*(fP/(cp.K_P+fP))*gN*gX;
+  const gNs=cp.K_PIN/(Cn+cp.K_PIN);
+  const gPS=Cs/(cp.K_PS+Cs+Cs*Cs/cp.K_PIS);
+  const gsat=Math.max(0,1-Math.pow(fP/cp.fP_max,cp.beta));
+  const mu_ps=cp.mu_ps_max*sc*phi_a*gNs*gPS*gsat;
+  return [mu_xs,mu_xp,mu_ps,fP];
+}
+function besRate(Vapp,Scod,bp){
+  const eta=bp.V1*Vapp-bp.V2-bp.E_KA;
+  const nernst=1/(1+Math.exp(-F_FAR*eta/(R_GAS*T_K)));
+  const monod=Scod/(bp.K_SD+Scod);
+  let j=bp.j_ref*(eta/bp.eta_ref)*nernst*monod;
+  j=Math.max(j,0);
+  const I=j*(bp.A_cat*1e-4);
+  return I*bp.FE/(bp.n_e*F_FAR)*bp.M_w*3600;
+}
+
+function makeController(ct,cp,qp,Jcal,rnd){
+  const st={lt:0,iS:0,iV:0,iN:0,iG:0,phase:0,Ghat:NaN,tsw:NaN};
+  return {st, fn:function(t,y){
+    const [Cs,Cn,Cx,Cp,G,Csens,V,Mres,phi_a]=y;
+    const dt=Math.max(t-st.lt,0); st.lt=t;
+    // carbon substrate-stat
+    let eS=ct.Cs_set-Cs; st.iS=Math.min(Math.max(st.iS+eS*dt,-0.5),0.5);
+    const FS=Math.min(Math.max(ct.Kc_S*(eS+st.iS/ct.tau_IS),0),ct.F_S_max);
+    // BES potential on reservoir level
+    let eV=ct.M_res_set-Mres; st.iV=Math.min(Math.max(st.iV+eV*dt,-300),300);
+    const Vapp=Math.min(Math.max(ct.V_app+ct.Kc_V*(eV+st.iV/ct.tau_IV),
+                        ct.V_app_min),ct.V_app_max);
+    // N-stat shared by every strategy during the growth phase, so the clock
+    // baseline is fairly tuned and differs only in HOW the switch is decided.
+    const nstat=()=>{
+      let eN=ct.Cn_set-Cn; st.iN=Math.min(Math.max(st.iN+eN*dt,-5),5);
+      return Math.min(Math.max(ct.Kc_N*(eN+st.iN/ct.tau_IN),0),ct.F_N_max);
+    };
+    if(ct.mode==="open"){
+      if(isNaN(st.tsw)&&t>=ct.t_switch) st.tsw=t;
+      return [FS,(t>=ct.t_switch?0:nstat()),Vapp];
+    }
+    const phiP=granulePhi(Cx,Cp,cp);
+    const qm=quantumMap(Math.max(G,0),phiP,qp,Jcal,Cx,Cp);
+    let Rt=qm.Rt;
+    if(ct.noise_sd>0) Rt=Rt*(1+rnd()*ct.noise_sd);
+    const lvl={closed_raw:"none",closed_od:"od_only",closed_multiscale:"full"}[ct.mode];
+    st.Ghat=invertMap(Rt,phiP,qp,Jcal,Cx,Cp,lvl);
+    if(st.phase===0&&Cx>=ct.Cx_target){st.phase=1; st.tsw=t;}
+    if(st.phase===0){ return [FS,nstat(),Vapp]; }
+    const e=ct.G_set-st.Ghat;
+    st.iG=Math.min(Math.max(st.iG+e*dt,-40),40);
+    const u=-ct.Kc*(e+st.iG/ct.tau_I);
+    return [FS,Math.min(Math.max(u,0),ct.F_N_max),Vapp];
+  }};
+}
+
+function rhs(t,y,cp,bp,qp,Jcal,ctrl){
+  let [Cs,Cn,Cx,Cp,G,Csens,V,Mres,phi_a]=y;
+  Cs=Math.max(Cs,0); Cn=Math.max(Cn,0); Cx=Math.max(Cx,1e-9);
+  Cp=Math.max(Cp,0); G=Math.max(G,0); Csens=Math.max(Csens,0);
+  V=Math.max(V,1e-6); Mres=Math.max(Mres,0);
+  phi_a=Math.min(Math.max(phi_a,0),1);
+
+  const burden=cp.burden*(Csens/Cx);
+  const [mu_xs,mu_xp,mu_ps]=rates(Cs,Cn,Cx,Cp,cp,burden,phi_a);
+  const mu_x=mu_xs+mu_xp;
+
+  let [FS,FN,Vapp]=ctrl(t,y);
+  const Rform=besRate(Vapp,bp.S_cod_anode,bp);
+  if(Mres<=0) FS=Math.min(FS,Rform/cp.C_SF);
+  FS=Math.max(FS,0);
+  let dMres=Rform-FS*cp.C_SF;
+  if(Mres>=bp.M_res_max&&dMres>0) dMres=0;
+
+  const Ftot=FS+FN, D=Ftot/V;
+  const qS=mu_xs/cp.Y_xs+mu_ps/cp.Y_pi+cp.m_s;
+  const dCs=FS*cp.C_SF/V-D*Cs-qS*Cx;
+  const dCn=FN*cp.C_NF/V-D*Cn-(mu_xs+mu_xp)/cp.Y_xN*Cx;
+  const dCx=(mu_xs+mu_xp-D)*Cx;
+  const dCp=(mu_ps-mu_xp/cp.Y_xp)*Cx-D*Cp;
+  const vprod=cp.k_G*qS+cp.G_basal;
+  const vgog=cp.V_GS*(G/(cp.K_G+G))*(Cn/(cp.K_NG+Cn));
+  const dG=vprod-vgog-(cp.k_Gdeg+mu_x)*G;
+  const dCsens=cp.k_exp*Cx-(mu_x+cp.k_bleach*qp.I_exc)*Csens;
+  const dphi=-inactivation(Cn,cp)*phi_a+mu_xs*(1-phi_a);
+  return [dCs,dCn,dCx,dCp,dG,dCsens,Ftot,dMres,dphi];
+}
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;
+  let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;
+  return ((t^t>>>14)>>>0)/4294967296-0.5;};}
+
+function defaultCtrl(mode,over){
+  return Object.assign({
+    mode:mode, G_set:0.160, t_switch:60.0, F_N_max:0.00300,
+    Kc:0.00090, tau_I:3.0, V_app:0.90, V_app_min:0.70, V_app_max:1.05,
+    Cs_set:0.45, F_S_max:0.060, Kc_S:0.030, tau_IS:1.0,
+    M_res_set:60.0, Kc_V:0.004, tau_IV:10.0,
+    Cn_set:0.400, Kc_N:0.0060, tau_IN:4.0,
+    Cx_target:7.0, noise_sd:0.02
+  }, over||{});
+}
+
+function simulate(cp,bp,qp,ct,tEnd,dt,seed){
+  tEnd=tEnd||96; dt=dt||0.01;
+  const Jcal=overlapDensity(qp);
+  const rnd=mulberry32((seed||0)*2654435761+1);
+  const C=makeController(ct,cp,qp,Jcal,rnd);
+  let y=[1.00,0.60,0.50,0.005,0.30,0.0050,1.0,bp.M_res0,1.0];
+  const n=Math.round(tEnd/dt);
+  const keep=Math.max(1,Math.round(0.25/dt));
+  const out={t:[],y:[],aux:[]};
+  const floor=[0,0,1e-9,0,0,0,1e-6,0,0];
+  const push=(t,yy)=>{
+    const phiP=granulePhi(yy[2],yy[3],cp);
+    const qm=quantumMap(yy[4],phiP,qp,Jcal,yy[2],yy[3]);
+    const [FS,FN,Va]=C.fn(t,yy);
+    out.t.push(t); out.y.push(yy.slice());
+    out.aux.push([phiP,qm.Rt,qm.E,qm.n,Va,C.st.Ghat,FN,yy[3]/Math.max(yy[2],1e-9),
+                  qm.R0_holo,qm.drift]);
+  };
+  push(0,y);
+  for(let i=0;i<n;i++){
+    const t=i*dt;
+    const f=(tt,yy)=>rhs(tt,yy,cp,bp,qp,Jcal,C.fn);
+    const k1=f(t,y);
+    const y2=y.map((v,j)=>v+0.5*dt*k1[j]); const k2=f(t+0.5*dt,y2);
+    const y3=y.map((v,j)=>v+0.5*dt*k2[j]); const k3=f(t+0.5*dt,y3);
+    const y4=y.map((v,j)=>v+dt*k3[j]);     const k4=f(t+dt,y4);
+    y=y.map((v,j)=>v+dt/6*(k1[j]+2*k2[j]+2*k3[j]+k4[j]));
+    y=y.map((v,j)=>Math.max(v,floor[j]));
+    y[8]=Math.min(y[8],1);
+    if((i+1)%keep===0) push(t+dt,y);
+  }
+  out.tsw=C.st.tsw;
+  return out;
+}
+
+function metrics(res){
+  const L=res.y.length-1, y=res.y[L];
+  const titre=y[3], Cx=y[2], phia=y[8];
+  const viable=phia*Cx;
+  const J=titre+0.35*viable;
+  let num=0,den=0;
+  for(let i=0;i<res.t.length;i++){
+    if(res.t[i]>45&&res.y[i][4]>1e-6&&isFinite(res.aux[i][5])){
+      num+=(res.aux[i][5]-res.y[i][4])/res.y[i][4]; den++;
+    }
+  }
+  return {titre:titre,fP:titre/Math.max(Cx,1e-9),Cx:Cx,phi_a:phia,
+          viable:viable,J:J,estErr:den?100*num/den:NaN,
+          prod:titre/res.t[L]};
+}
+
+/* ------------------------------------------------------------------ plots */
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function plot(id,series,opts){
+  opts=opts||{};
+  const cv=document.getElementById(id), ctx=cv.getContext("2d");
+  const DPR=Math.min(window.devicePixelRatio||1,2);
+  const W=cv.clientWidth||520, H=Math.round(W*0.5);
+  cv.width=W*DPR; cv.height=H*DPR; cv.style.height=H+"px";
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,W,H);
+  const ml=48,mr=opts.right?50:14,mt=10,mb=28;
+  const pw=W-ml-mr, ph=H-mt-mb;
+  const ink=css("--ink"), muted=css("--muted"), grid=css("--grid");
+
+  let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
+  let y2min=Infinity,y2max=-Infinity;
+  series.forEach(s=>{s.x.forEach(v=>{if(v<xmin)xmin=v;if(v>xmax)xmax=v;});
+    s.y.forEach(v=>{if(!isFinite(v))return;
+      if(s.axis===2){if(v<y2min)y2min=v;if(v>y2max)y2max=v;}
+      else{if(v<ymin)ymin=v;if(v>ymax)ymax=v;}});});
+  if(opts.ymin!==undefined)ymin=opts.ymin; if(opts.ymax!==undefined)ymax=opts.ymax;
+  if(!isFinite(ymin)){ymin=0;ymax=1;}
+  if(ymax-ymin<1e-9)ymax=ymin+1;
+  const pad=(ymax-ymin)*0.08; ymin-=pad; ymax+=pad;
+  if(opts.ymin!==undefined)ymin=opts.ymin;
+  if(isFinite(y2min)){const p2=(y2max-y2min)*0.08||1;y2min-=p2;y2max+=p2;
+    if(opts.y2min!==undefined)y2min=opts.y2min;}
+
+  const X=v=>ml+(v-xmin)/(xmax-xmin)*pw;
+  const Y=v=>mt+ph-(v-ymin)/(ymax-ymin)*ph;
+  const Y2=v=>mt+ph-(v-y2min)/(y2max-y2min)*ph;
+
+  // Tick precision follows the axis RANGE, so a narrow axis keeps its detail.
+  const prec=(span)=>{
+    if(!isFinite(span)||span<=0)return 2;
+    const d=Math.ceil(-Math.log10(span/4))+1;
+    return Math.min(Math.max(d,0),4);
+  };
+  ctx.strokeStyle=grid; ctx.lineWidth=1; ctx.font="10px IBM Plex Mono, monospace";
+  ctx.fillStyle=muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  const py1=prec(ymax-ymin);
+  for(let i=0;i<=4;i++){
+    const v=ymin+(ymax-ymin)*i/4, yy=Y(v);
+    ctx.beginPath();ctx.moveTo(ml,yy);ctx.lineTo(ml+pw,yy);ctx.stroke();
+    ctx.fillText(v.toFixed(py1),ml-6,yy);
+  }
+  if(opts.right){
+    ctx.textAlign="left";
+    const py2=prec(y2max-y2min);
+    for(let i=0;i<=4;i++){
+      const v=y2min+(y2max-y2min)*i/4;
+      ctx.fillText(v.toFixed(py2),ml+pw+6,Y2(v));
+    }
+  }
+  ctx.textAlign="center";ctx.textBaseline="top";
+  const px1=prec(xmax-xmin);
+  for(let i=0;i<=4;i++){
+    const v=xmin+(xmax-xmin)*i/4;
+    ctx.fillText(opts.logx?Math.pow(10,v).toPrecision(2):v.toFixed(px1),X(v),mt+ph+7);
+  }
+  ctx.strokeStyle=css("--line");
+  ctx.beginPath();ctx.moveTo(ml,mt);ctx.lineTo(ml,mt+ph);ctx.lineTo(ml+pw,mt+ph);ctx.stroke();
+  if(ymin<0&&ymax>0){ctx.strokeStyle=muted;ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(ml,Y(0));ctx.lineTo(ml+pw,Y(0));ctx.stroke();ctx.setLineDash([]);}
+
+  series.forEach(s=>{
+    ctx.strokeStyle=s.c; ctx.lineWidth=s.w||1.7;
+    if(s.dash)ctx.setLineDash(s.dash);
+    ctx.beginPath(); let started=false;
+    const YY=s.axis===2?Y2:Y;
+    for(let i=0;i<s.x.length;i++){
+      if(!isFinite(s.y[i])){started=false;continue;}
+      const px=X(s.x[i]),py=YY(s.y[i]);
+      if(!started){ctx.moveTo(px,py);started=true;}else ctx.lineTo(px,py);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+  });
+  ctx.fillStyle=muted;ctx.textAlign="center";
+  if(opts.xlabel){ctx.fillText(opts.xlabel,ml+pw/2,mt+ph+16);}
+}
+
+/* ------------------------------------------------------------------- app */
+let LAST=null, COMPARE=null;
+const el=id=>document.getElementById(id);
+
+function readUI(){
+  const qp=Object.assign({},QP0,{
+    K_D:+el("kd").value, R_holo:+el("rholo").value, a_P:+el("ap").value});
+  const cp=Object.assign({},CP0,{
+    mu_xs_max:CP0.mu_xs_max*+el("mu").value,
+    mu_ps_max:CP0.mu_ps_max*+el("mups").value,
+    K_IS:CP0.K_IS*+el("kis").value});
+  const ct=defaultCtrl(el("mode").value,{
+    G_set:+el("gset").value, t_switch:+el("tsw").value,
+    noise_sd:+el("noise").value/100});
+  return {qp,cp,bp:Object.assign({},BP0),ct};
+}
+
+function fmt(v,d){return isFinite(v)?v.toFixed(d===undefined?2:d):"–";}
+
+function renderKPIs(m,res){
+  const items=[
+    ["PHA titre",fmt(m.titre,2),"g/L"],
+    ["Polymer fraction",fmt(100*m.fP,1),"%"],
+    ["Biomass",fmt(m.Cx,2),"g/L"],
+    ["Active fraction",fmt(m.phi_a,3),""],
+    ["Estimator error",(isFinite(m.estErr)?(m.estErr>0?"+":"")+fmt(m.estErr,1):"–"),"%"],
+    ["Objective J",fmt(m.J,3),"g/L"]
+  ];
+  el("kpis").innerHTML=items.map(([k,v,u],i)=>{
+    let col="";
+    if(k==="Estimator error"&&isFinite(m.estErr))
+      col=Math.abs(m.estErr)>5?"color:var(--warn)":"color:var(--ok)";
+    if(k==="Objective J") col="color:var(--donor)";
+    return `<div class="kpi"><span class="k">${k}</span>
+      <span class="v" style="${col}">${v}<span class="u"> ${u}</span></span></div>`;
+  }).join("");
+}
+
+function renderProcess(res){
+  const t=res.t, y=res.y, a=res.aux;
+  const col=(i)=>y.map(r=>r[i]), ac=(i)=>a.map(r=>r[i]);
+  plot("c1",[
+    {x:t,y:col(2),c:css("--donor")},
+    {x:t,y:col(3),c:css("--acceptor")},
+    {x:t,y:col(8).map(v=>v*10),c:css("--ok"),dash:[4,3],w:1.3}
+  ],{ymin:0,xlabel:"time (h)"});
+  plot("c2",[
+    {x:t,y:col(1),c:css("--donor")},
+    {x:t,y:col(4),c:css("--acceptor"),axis:2},
+    {x:t,y:t.map(()=>+el("gset").value),c:css("--warn"),dash:[3,3],w:1.2,axis:2}
+  ],{ymin:0,y2min:0,right:true,xlabel:"time (h)"});
+  plot("c3",[
+    {x:t,y:col(0),c:css("--donor")},
+    {x:t,y:ac(6).map(v=>v*1000),c:css("--acceptor"),axis:2}
+  ],{ymin:0,y2min:0,right:true,xlabel:"time (h)"});
+  plot("c4",[
+    {x:t,y:ac(0),c:css("--donor")},
+    {x:t,y:ac(7),c:css("--acceptor")}
+  ],{ymin:0,xlabel:"time (h)"});
+}
+
+function renderSensor(res){
+  const {qp,cp}=readUI(); const Jcal=overlapDensity(qp);
+  const G=[],lg=[];
+  for(let i=0;i<=120;i++){const v=-2.3+(1.0+2.3)*i/120;lg.push(v);G.push(Math.pow(10,v));}
+  plot("c5",[0,0.15,0.30].map((p,i)=>({
+    x:lg,y:G.map(g=>quantumMap(g,p,qp,Jcal,0,0).Rt),
+    c:[css("--donor"),css("--acceptor"),css("--warn")][i]
+  })),{logx:true,xlabel:"2-OG (mM)"});
+
+  const fP=[],bias={none:[],od_only:[],full:[]};
+  for(let i=0;i<=40;i++){
+    const f=0.75*i/40, Cx=11, Cp=11*f;
+    const phi=granulePhi(Cx,Cp,cp);
+    const qm=quantumMap(0.16,phi,qp,Jcal,Cx,Cp);
+    fP.push(f);
+    ["none","od_only","full"].forEach(L=>{
+      bias[L].push(100*(invertMap(qm.Rt,phi,qp,Jcal,Cx,Cp,L)-0.16)/0.16);});
+  }
+  plot("c6",[
+    {x:fP,y:bias.none,c:css("--warn")},
+    {x:fP,y:bias.od_only,c:css("--acceptor")},
+    {x:fP,y:bias.full,c:css("--donor")}
+  ],{xlabel:"polymer fraction f_P"});
+
+  const t=res.t,ser=[];
+  const e=res.t.map((_,i)=>{
+    const g=res.y[i][4],gh=res.aux[i][5];
+    return (isFinite(gh)&&g>1e-4)?100*(gh-g)/g:NaN;});
+  plot("c7",[{x:t,y:e,c:css("--donor")}],{xlabel:"time (h)"});
+
+  const fp2=[],r0=[],dr=[];
+  for(let i=0;i<=40;i++){
+    const f=0.75*i/40,Cx=11,Cp=11*f,phi=granulePhi(Cx,Cp,cp);
+    const qm=quantumMap(0.16,phi,qp,Jcal,Cx,Cp);
+    fp2.push(f);r0.push(qm.R0_holo);dr.push(qm.drift);
+  }
+  plot("c8",[
+    {x:fp2,y:r0,c:css("--donor")},
+    {x:fp2,y:dr,c:css("--acceptor"),axis:2}
+  ],{right:true,xlabel:"polymer fraction f_P"});
+
+  const R0=forsterR0(2/3,1.33,qp), J0=coulombJ(Math.sqrt(2/3),R0,1.33,qp);
+  const wJ=2*Math.PI*C_LIGHT*J0, gam=1/qp.T2_star;
+  const th=kriegerDougherty(0,qp.eta_cyto0,qp.phi_pack)*qp.V_hydro/(KB*T_K);
+  el("photo").textContent=
+    `J = ${Jcal.toExponential(3)} cm   |   R0(k²=2/3, n=1.33) = ${R0.toFixed(2)} Å   |   `+
+    `J(R0) = ${J0.toFixed(4)} cm⁻¹   |   2ω_J/γ = ${(2*wJ/gam).toExponential(2)} `+
+    `(Förster regime)   |   θ_rot = ${(th*1e9).toFixed(1)} ns vs τ_D = 4.0 ns   `+
+    `→ κ²_eff(holo) = ${kappa2Eff(0,qp.kappa2_static_holo,qp).toFixed(3)}, not 2/3`;
+}
+
+function runOne(){
+  el("runstat").textContent="running…";
+  const {qp,cp,bp,ct}=readUI();
+  setTimeout(()=>{
+    const res=simulate(cp,bp,qp,ct,96,0.01,0);
+    LAST=res;
+    const m=metrics(res);
+    renderKPIs(m,res); renderProcess(res); renderSensor(res);
+    el("runstat").textContent="J = "+m.J.toFixed(3)+" g/L";
+  },10);
+}
+
+function runCompare(){
+  el("runstat").textContent="comparing…";
+  const {qp,cp,bp}=readUI();
+  setTimeout(()=>{
+    const rows=[];
+    const modes=[["open","Clock (open loop)"],["closed_raw","Closed — raw ratio"],
+                 ["closed_od","Closed — OD-corrected"],["closed_multiscale","Closed — multiscale"]];
+    modes.forEach(([mo,label])=>{
+      const ct=defaultCtrl(mo,{G_set:+el("gset").value,t_switch:+el("tsw").value,
+                               noise_sd:+el("noise").value/100});
+      const m=metrics(simulate(cp,bp,qp,ct,96,0.01,0));
+      rows.push([label,m]);
+    });
+    const best=Math.max(...rows.map(r=>r[1].J));
+    el("cmp").querySelector("tbody").innerHTML=rows.map(([l,m])=>{
+      const hi=Math.abs(m.J-best)<1e-9;
+      return `<tr${hi?' style="font-weight:600"':''}><td>${l}</td>
+        <td class="num">${fmt(m.titre,2)}</td>
+        <td class="num">${fmt(100*m.fP,1)}%</td>
+        <td class="num">${fmt(m.Cx,2)}</td>
+        <td class="num">${fmt(m.phi_a,3)}</td>
+        <td class="num" style="${isFinite(m.estErr)&&Math.abs(m.estErr)>5?'color:var(--warn)':''}">${
+          isFinite(m.estErr)?(m.estErr>0?"+":"")+fmt(m.estErr,1)+"%":"–"}</td>
+        <td class="num" style="color:var(--donor)">${fmt(m.J,3)}</td></tr>`;
+    }).join("");
+    el("runstat").textContent="comparison complete";
+    document.querySelector('.tab[data-p="compare"]').click();
+  },10);
+}
+
+/* UI wiring */
+const sliders=[["gset","gset_v",v=>(+v).toFixed(3)],["tsw","tsw_v",v=>(+v).toFixed(0)+" h"],
+  ["kd","kd_v",v=>(+v).toFixed(3)+" mM"],["rholo","rholo_v",v=>(+v).toFixed(0)+" Å"],
+  ["ap","ap_v",v=>(+v).toFixed(2)],["noise","noise_v",v=>(+v).toFixed(1)+" %"],
+  ["mu","mu_v",v=>(+v).toFixed(2)+"×"],["mups","mups_v",v=>(+v).toFixed(2)+"×"],
+  ["kis","kis_v",v=>(+v).toFixed(2)+"×"]];
+sliders.forEach(([id,out,f])=>{
+  const s=el(id); const upd=()=>el(out).textContent=f(s.value);
+  s.addEventListener("input",upd); upd();
+});
+el("run").addEventListener("click",runOne);
+el("compare").addEventListener("click",runCompare);
+el("mode").addEventListener("change",runOne);
+el("reset").addEventListener("click",()=>{
+  const d={gset:0.16,tsw:60,kd:0.20,rholo:46,ap:0.12,noise:2,mu:1,mups:1,kis:1};
+  Object.entries(d).forEach(([k,v])=>{el(k).value=v;el(k).dispatchEvent(new Event("input"));});
+  el("mode").value="closed_multiscale"; runOne();
+});
+document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected",x===b));
+  ["process","sensor","compare","code"].forEach(p=>el("p_"+p).hidden=(p!==b.dataset.p));
+  if(b.dataset.p==="process"&&LAST)renderProcess(LAST);
+  if(b.dataset.p==="sensor"&&LAST)renderSensor(LAST);
+}));
+window.addEventListener("resize",()=>{
+  const sel=document.querySelector('.tab[aria-selected=true]').dataset.p;
+  if(LAST&&sel==="process")renderProcess(LAST);
+  if(LAST&&sel==="sensor")renderSensor(LAST);
+});
+
+const PY_SRC = "\"\"\"\nQCELL: a quantum-to-cellular multiscale framework for closed-loop PHA biosynthesis.\n\nCouples\n  (Q) a femtosecond-to-nanosecond excitonic / FRET photophysics layer describing a\n      genetically encoded PII-based 2-oxoglutarate biosensor, with\n  (C) a minute-to-hour cellular layer: a bioelectrochemical formate supply\n      (Nernst-Monod, after Shemfe et al. 2018) feeding a dynamic physics-based\n      PHA fermentation model (after Sadhukhan, Sen & Hu 2026).\n\nThe coupling is bidirectional:\n  C -> Q : intracellular 2-OG G, PHA granule volume fraction phi_P (-> refractive\n           index n_cyt and cytoplasmic viscosity eta -> kappa^2), sensor loading.\n  Q -> C : the ratiometric observable Rt -> UKF state estimate -> nitrogen feed\n           F_N and applied BES potential V_app; plus expression burden on mu_max.\n\nAuthor: generated reference implementation.\nUnits: g/L, h, cm^-1, Angstrom, mM unless stated.\n\"\"\"\n\nimport numpy as np\nfrom dataclasses import dataclass, field, asdict\n\n# ----------------------------------------------------------------------------\n# Physical constants\n# ----------------------------------------------------------------------------\nC_LIGHT = 2.99792458e10      # cm/s\nN_AVO = 6.02214076e23\nF_FARADAY = 96485.0          # C/mol\nR_GAS = 8.314                # J/mol/K\nT_KELVIN = 298.15\n\n# Debye^2 / Angstrom^3 -> cm^-1 for the point-dipole coupling\nDIPOLE_PREFACTOR = 5034.1    # = 1e8 * 1e-18^2 / (4 pi eps0) / (h c) ... see docs\n\n\n# ============================================================================\n# QUANTUM LAYER\n# ============================================================================\n\n@dataclass\nclass QuantumParams:\n    \"\"\"Photophysics of the donor-acceptor FRET pair on the PII sensor scaffold.\"\"\"\n    # Donor / acceptor photophysics (mTurquoise2 -> mVenus like)\n    phi_D: float = 0.93          # donor fluorescence quantum yield\n    phi_A: float = 0.57          # acceptor fluorescence quantum yield\n    tau_D0: float = 4.0e-9       # donor excited-state lifetime, s (no acceptor)\n    J_overlap: float = 2.4e15    # spectral overlap, M^-1 cm^-1 nm^4\n    mu_D: float = 4.37           # donor transition dipole, Debye\n    mu_A: float = 8.86           # acceptor transition dipole, Debye\n    nu_D: float = 23041.0        # donor emission centroid, cm^-1\n    nu_A: float = 19417.0        # acceptor absorption centroid, cm^-1\n\n    # Sensor geometry in the two conformational states\n    R_apo: float = 68.0          # donor-acceptor separation, apo state, Angstrom\n    R_holo: float = 46.0         # donor-acceptor separation, 2-OG bound, Angstrom\n    kappa2_static_apo: float = 0.52\n    kappa2_static_holo: float = 1.15\n\n    # Ligand binding (PII trimer, 2-OG; negative cooperativity -> h slightly > 1)\n    K_D: float = 0.20            # 2-OG dissociation constant, mM (PII sensor variant)\n    hill_h: float = 1.15\n\n    # Hydrodynamics of the fluorophore domains (for kappa^2 dynamic averaging)\n    V_hydro: float = 8.0e-26     # m^3, effective rotational volume of an FP barrel\n    eta_cyto0: float = 3.0e-3    # Pa s, cytoplasmic viscosity at phi_P = 0\n\n    # Optical environment\n    n_cytosol: float = 1.360     # refractive index of PHA-free cytosol\n    n_granule: float = 1.490     # refractive index of a PHB granule\n    phi_pack: float = 0.68       # granule random-close-packing limit\n\n    # Detection channel\n    alpha_direct: float = 0.085  # direct acceptor excitation / donor excitation\n    bleed_DA: float = 0.055      # donor bleed-through into acceptor channel\n    I_exc: float = 1.0           # relative excitation irradiance\n    dark: float = 0.004          # relative dark/background offset\n\n    # Dephasing (links to the excitonic-coupling literature)\n    T2_star: float = 60e-15      # pure dephasing time, s\n\n    # Optical transport from the cell to an in-situ probe. At process scale the\n    # ratio is read through a turbid suspension, so the donor and acceptor bands\n    # are attenuated unequally by cell and granule scattering (Mie regime).\n    lam_D: float = 480.0         # nm, donor emission band\n    lam_A: float = 530.0         # nm, acceptor emission band\n    lam_ref: float = 500.0       # nm, reference wavelength\n    p_mie: float = 1.5           # scattering wavelength exponent\n    a_X: float = 0.250           # L/g/cm, attenuation per unit residual biomass\n    a_P: float = 0.120           # L/g/cm, EXTRA attenuation per unit PHA granule\n    L_eff: float = 0.30          # cm, effective optical path of the probe\n\n\ndef lorentz_lorenz_mix(phi, n_host, n_incl):\n    \"\"\"Effective refractive index of granules dispersed in cytosol.\n\n    Volume-additive polarisability (Lorentz-Lorenz / Clausius-Mossotti):\n        (n^2-1)/(n^2+2) = (1-phi)(n_h^2-1)/(n_h^2+2) + phi (n_i^2-1)/(n_i^2+2)\n    \"\"\"\n    f_h = (n_host**2 - 1.0) / (n_host**2 + 2.0)\n    f_i = (n_incl**2 - 1.0) / (n_incl**2 + 2.0)\n    f = (1.0 - phi) * f_h + phi * f_i\n    return np.sqrt((1.0 + 2.0 * f) / (1.0 - f))\n\n\ndef krieger_dougherty(phi, eta0, phi_max=0.68, exponent=2.5):\n    \"\"\"Suspension viscosity as granules fill the cytoplasm.\"\"\"\n    x = np.clip(phi / phi_max, 0.0, 0.95)\n    return eta0 * (1.0 - x) ** (-exponent * phi_max)\n\n\ndef kappa2_effective(phi_P, kappa2_static, qp: QuantumParams, T=T_KELVIN):\n    \"\"\"Orientation factor under partial rotational averaging.\n\n    Steady-state anisotropy gives the FROZEN fraction, r_ss/r_0 = 1/(1+tau_D/theta);\n    the complementary part has reoriented within the donor lifetime, so\n        f_dyn = tau_D / (theta_rot + tau_D).\n    Full averaging gives kappa^2 -> 2/3; a frozen geometry retains kappa2_static.\n    Fluorescent-protein barrels tumble on tens of nanoseconds against a ~4 ns\n    donor lifetime, so kappa^2 stays close to its static value throughout.\n    \"\"\"\n    eta = krieger_dougherty(phi_P, qp.eta_cyto0, qp.phi_pack)\n    theta_rot = eta * qp.V_hydro / (1.380649e-23 * T)      # s\n    f_dyn = qp.tau_D0 / (theta_rot + qp.tau_D0)\n    return (2.0 / 3.0) * f_dyn + kappa2_static * (1.0 - f_dyn)\n\n\ndef forster_R0(kappa2, n_med, qp: QuantumParams):\n    \"\"\"Forster radius in Angstrom. J_overlap in M^-1 cm^-1 nm^4.\"\"\"\n    return 0.211 * (kappa2 * n_med**-4 * qp.phi_D * qp.J_overlap) ** (1.0 / 6.0)\n\n\ndef coulomb_coupling(kappa, R_ang, n_med, qp: QuantumParams):\n    \"\"\"Point-dipole electronic coupling J in cm^-1, optically screened by n^2.\"\"\"\n    return DIPOLE_PREFACTOR * kappa * qp.mu_D * qp.mu_A / (n_med**2 * R_ang**3)\n\n\ndef spectral_overlap_density(qp: QuantumParams):\n    \"\"\"Effective density of accepting states (cm) calibrated so that the golden\n    rule k = 4 pi^2 c J^2 Jcal reproduces the Forster rate at R = R0.\n\n    This makes the quantum layer internally consistent: the same coupling J that\n    appears in excitonic treatments reproduces the measured Forster radius.\n    \"\"\"\n    kappa2_ref = 2.0 / 3.0\n    n_ref = 1.33\n    R0 = forster_R0(kappa2_ref, n_ref, qp)\n    J0 = coulomb_coupling(np.sqrt(kappa2_ref), R0, n_ref, qp)\n    return 1.0 / (4.0 * np.pi**2 * C_LIGHT * J0**2 * qp.tau_D0)\n\n\ndef eet_rate(kappa2, R_ang, n_med, qp: QuantumParams, Jcal, coherent=True):\n    \"\"\"Excitation energy transfer rate, s^-1.\n\n    Golden-rule form k = 4 pi^2 c J^2 Jcal, which equals the Forster rate.\n    With coherent=True a Haken-Strobl / Redfield correction is applied that\n    attenuates the rate when the dephasing rate gamma is not large compared with\n    the coupling: k_corr = k / (1 + (2 omega_J / gamma)^2).\n    \"\"\"\n    kappa = np.sqrt(np.maximum(kappa2, 1e-12))\n    J = coulomb_coupling(kappa, R_ang, n_med, qp)\n    k = 4.0 * np.pi**2 * C_LIGHT * J**2 * Jcal\n    if coherent:\n        omega_J = 2.0 * np.pi * C_LIGHT * J          # rad/s\n        gamma = 1.0 / qp.T2_star\n        k = k / (1.0 + (2.0 * omega_J / gamma) ** 2)\n    return k, J\n\n\ndef fret_efficiency(kappa2, R_ang, n_med, qp: QuantumParams, Jcal, coherent=True):\n    k, J = eet_rate(kappa2, R_ang, n_med, qp, Jcal, coherent)\n    E = k / (k + 1.0 / qp.tau_D0)\n    return E, J\n\n\ndef optical_attenuation(Cx, Cp, qp: QuantumParams):\n    \"\"\"Band-resolved attenuation of the two emission channels, exp(-A).\n\n    Granules raise the scattering coefficient beyond what biomass alone explains,\n    and because scattering falls with wavelength the shorter donor band is\n    attenuated more. The ratio is therefore inflated as polymer accumulates --\n    a drift that normalising by optical density alone cannot remove, because it\n    depends on the polymer content, not the cell count.\n    \"\"\"\n    Cr = np.maximum(Cx - Cp, 0.0)\n    mu_ref = qp.a_X * Cr + (qp.a_X + qp.a_P) * np.maximum(Cp, 0.0)\n    A_D = mu_ref * (qp.lam_ref / qp.lam_D) ** qp.p_mie * qp.L_eff\n    A_A = mu_ref * (qp.lam_ref / qp.lam_A) ** qp.p_mie * qp.L_eff\n    return np.exp(-A_D), np.exp(-A_A)\n\n\ndef sensor_occupancy(G_mM, qp: QuantumParams):\n    \"\"\"Fractional 2-OG occupancy of the PII sensor (Hill).\"\"\"\n    G = np.maximum(G_mM, 0.0)\n    return G**qp.hill_h / (G**qp.hill_h + qp.K_D**qp.hill_h)\n\n\ndef quantum_map(G_mM, phi_P, qp: QuantumParams, Jcal, coherent=True,\n                Cx=0.0, Cp=0.0):\n    \"\"\"The full C -> Q map.\n\n    Returns the ratiometric observable and the intermediate quantities.\n    Conformational exchange (microseconds) is slow relative to the donor\n    lifetime (nanoseconds), so the ensemble averages efficiencies, not geometries.\n    \"\"\"\n    n_med = lorentz_lorenz_mix(phi_P, qp.n_cytosol, qp.n_granule)\n    k2_apo = kappa2_effective(phi_P, qp.kappa2_static_apo, qp)\n    k2_holo = kappa2_effective(phi_P, qp.kappa2_static_holo, qp)\n\n    E_apo, J_apo = fret_efficiency(k2_apo, qp.R_apo, n_med, qp, Jcal, coherent)\n    E_holo, J_holo = fret_efficiency(k2_holo, qp.R_holo, n_med, qp, Jcal, coherent)\n\n    theta = sensor_occupancy(G_mM, qp)\n    E = (1.0 - theta) * E_apo + theta * E_holo\n\n    # Ratiometric readout: acceptor channel over donor channel\n    I_D = qp.I_exc * qp.phi_D * (1.0 - E)\n    I_A = qp.I_exc * (qp.phi_A * E + qp.alpha_direct * qp.phi_A\n                      + qp.bleed_DA * qp.phi_D * (1.0 - E))\n    # Optical transport to the probe\n    T_D, T_A = optical_attenuation(Cx, Cp, qp)\n    I_D = I_D * T_D + qp.dark\n    I_A = I_A * T_A + qp.dark\n    Rt = I_A / I_D\n\n    return dict(Rt=Rt, E=E, E_apo=E_apo, E_holo=E_holo, theta=theta,\n                T_D=T_D, T_A=T_A, ratio_drift=T_A / T_D,\n                n_med=n_med, kappa2_apo=k2_apo, kappa2_holo=k2_holo,\n                R0_apo=forster_R0(k2_apo, n_med, qp),\n                R0_holo=forster_R0(k2_holo, n_med, qp),\n                J_apo=J_apo, J_holo=J_holo, I_D=I_D, I_A=I_A)\n\n\ndef invert_quantum_map(Rt, phi_P, qp: QuantumParams, Jcal, coherent=True,\n                       phi_assumed=None, Cx=0.0, Cp=0.0, correction=\"full\"):\n    \"\"\"The Q -> C inverse: recover 2-OG from the ratio.\n\n    correction = 'full'    : the multiscale correction. Uses the model's own\n                             estimates of granule loading and polymer content to\n                             undo both the photophysical drift (n, kappa^2) and\n                             the band-resolved optical transport.\n    correction = 'od_only' : what a conventional calibration does. Normalises for\n                             cell density, but assumes a polymer-free cytoplasm,\n                             so it leaves the granule-specific terms uncorrected.\n    correction = 'none'    : raw ratio against a fixed calibration curve.\n    \"\"\"\n    if correction == \"full\":\n        phi_use = phi_P if phi_assumed is None else phi_assumed\n        T_D, T_A = optical_attenuation(Cx, Cp, qp)\n    elif correction == \"od_only\":\n        phi_use = 0.0\n        T_D, T_A = optical_attenuation(Cx, 0.0, qp)   # polymer ignored\n    else:\n        phi_use = 0.0\n        T_D = T_A = 1.0\n    Rt = Rt * (T_D / T_A)        # undo the transport distortion\n    phi_use = phi_use\n    n_med = lorentz_lorenz_mix(phi_use, qp.n_cytosol, qp.n_granule)\n    k2_apo = kappa2_effective(phi_use, qp.kappa2_static_apo, qp)\n    k2_holo = kappa2_effective(phi_use, qp.kappa2_static_holo, qp)\n    E_apo, _ = fret_efficiency(k2_apo, qp.R_apo, n_med, qp, Jcal, coherent)\n    E_holo, _ = fret_efficiency(k2_holo, qp.R_holo, n_med, qp, Jcal, coherent)\n\n    # Invert the detection model for E, then the mixing law for theta.\n    # Forward:  I_D = a.phi_D.(1-E) + d\n    #           I_A = a.[phi_A.E + alpha.phi_A + b.phi_D.(1-E)] + d\n    # Writing u = 1-E and Rt = I_A/I_D gives a linear equation in u:\n    a = qp.I_exc\n    num = a * qp.phi_A * (1.0 + qp.alpha_direct) + qp.dark * (1.0 - Rt)\n    den = a * (Rt * qp.phi_D - qp.bleed_DA * qp.phi_D + qp.phi_A)\n    u = num / den\n    E = np.clip(1.0 - u, 1e-6, 1 - 1e-6)\n\n    theta = np.clip((E - E_apo) / (E_holo - E_apo), 1e-9, 1 - 1e-9)\n    G = qp.K_D * (theta / (1.0 - theta)) ** (1.0 / qp.hill_h)\n    return G, E, theta\n\n\n# ============================================================================\n# CELLULAR LAYER\n# ============================================================================\n\n@dataclass\nclass BESParams:\n    \"\"\"Lumped bioelectrochemical formate generator (after Shemfe et al. 2018).\"\"\"\n    q_max: float = 7.92 / 24.0     # kgCOD/kgVS/h  (paper reports per day)\n    K_SD: float = 0.174            # kgCOD/m3 == g/L\n    E_KA: float = 0.0              # V, half-max rate potential (vs ref)\n    V1: float = 0.228              # applied-potential linear coefficient\n    V2: float = 0.0\n    A_cat: float = 25000.0         # cm2 (2.5 m2 modular cathode stack)\n    V_cat: float = 290.0           # cm3 per module\n    FE: float = 0.949              # Faradaic efficiency to formate\n    M_w: float = 46.03             # g/mol formate\n    n_e: float = 2.0\n    j_ref: float = 2.6             # A/m2 reference current density at eta_ref\n    eta_ref: float = 0.30          # V\n    S_cod_anode: float = 1.0       # g/L wastewater COD held at the anode\n    M_res0: float = 60.0           # g formate initially in the buffer reservoir\n    M_res_max: float = 400.0       # g, reservoir capacity\n\n\ndef bes_formate_rate(V_app, S_cod_anode, bp: BESParams, T=T_KELVIN):\n    \"\"\"Formate production rate from the BES cathode, g/h.\n\n    Nernst-Monod oxidation of wastewater COD at the anode sets the current\n    density (Shemfe Eqs. 1, 7-8); the current and the cathodic Faradaic\n    efficiency set formate synthesis (Shemfe Eq. 15). S_cod_anode is the\n    wastewater COD in the ANODE chamber, which is independent of the formate\n    concentration in the downstream fermenter.\n    \"\"\"\n    eta = bp.V1 * V_app - bp.V2 - bp.E_KA\n    nernst = 1.0 / (1.0 + np.exp(-F_FARADAY * eta / (R_GAS * T)))\n    monod = S_cod_anode / (bp.K_SD + S_cod_anode)\n    j = bp.j_ref * (eta / bp.eta_ref) * nernst * monod          # A/m2\n    j = np.maximum(j, 0.0)\n    A_m2 = bp.A_cat * 1e-4\n    I = j * A_m2                                                # A\n    mol_per_s = I * bp.FE / (bp.n_e * F_FARADAY)\n    return mol_per_s * bp.M_w * 3600.0                          # g/h\n\n\n@dataclass\nclass CellParams:\n    \"\"\"Dynamic physics-based PHA model (structure after Sadhukhan, Sen & Hu 2026),\n    parameterised for formate-grown Cupriavidus necator.\"\"\"\n    mu_xs_max: float = 0.18        # 1/h  (Gorret et al. 2015, formate)\n    mu_xp_max: float = 0.040       # 1/h, growth on remobilised PHA\n    mu_ps_max: float = 0.200       # g PHA / g cell / h\n\n    Y_xs: float = 0.090            # g cell / g formate\n    Y_pi: float = 0.100            # g PHA / g formate\n    Y_xp: float = 0.60             # g cell / g PHA (remobilisation)\n    Y_xN: float = 8.0              # g cell / g N\n    m_s: float = 0.020             # g formate / g cell / h\n\n    K_S: float = 0.10              # g/L\n    K_IS: float = 2.00             # g/L, formate substrate inhibition\n    K_N: float = 0.050             # g/L\n    K_IN: float = 10.0             # g/L\n    K_P: float = 0.10              # PHA fraction saturation for mu_xp\n    K_PS: float = 0.20             # g/L\n    K_PIS: float = 2.00            # g/L\n    K_PIN: float = 0.020           # g/L, nitrogen conc. half-inhibiting PHA synth.\n\n    # Active / inactive biomass split: total nitrogen starvation inactivates the\n    # PHA synthase machinery, so the optimum is nitrogen-LIMITED, not nitrogen-free\n    b_dec0: float = 0.0040         # 1/h, baseline inactivation\n    b_decN: float = 0.0900         # 1/h, additional inactivation under N starvation\n    K_Nv: float = 0.0100           # g/L, nitrogen conc. half-protecting viability\n\n    Cx_max: float = 15.0           # g/L\n    alpha: float = 1.0\n    fP_max: float = 0.80\n    beta: float = 2.0\n\n    # 2-oxoglutarate node\n    k_G: float = 1.35              # mM per (g formate / g cell / h)\n    V_GS: float = 2.60             # mM/h, GS-GOGAT capacity\n    K_G: float = 0.50              # mM\n    K_NG: float = 0.020            # g/L\n    G_basal: float = 0.030         # mM/h leak\n    k_Gdeg: float = 0.08           # 1/h, 2-OG efflux / anaplerotic drain\n\n    # Sensor expression and burden\n    k_exp: float = 0.0115          # g sensor / g cell / h\n    k_bleach: float = 0.004        # 1/h at unit irradiance\n    burden: float = 0.55           # fractional mu loss per unit specific sensor\n\n    # Feed composition\n    C_SF: float = 600.0            # g/L formate (concentrated formic acid, also the pH titrant)\n    C_NF: float = 40.0             # g/L nitrogen in concentrated nitrogen feed\n\n    rho_P: float = 1.25            # g/cm3, PHB granule\n    rho_R: float = 1.10            # g/cm3, residual biomass\n    rho_cell_wet: float = 1.00     # g/cm3 approximate wet cell density\n    dry_frac: float = 0.30         # dry weight fraction of wet cell volume\n\n\ndef granule_volume_fraction(Cx, Cp, cp: CellParams):\n    \"\"\"PHA granule volume fraction within the cytoplasm.\"\"\"\n    Cp = np.clip(Cp, 0.0, None)\n    Cr = np.maximum(Cx - Cp, 1e-9)\n    # Granules are essentially anhydrous; only the residual biomass is hydrated.\n    v_P = Cp / cp.rho_P\n    v_R_wet = (Cr / cp.dry_frac) / cp.rho_cell_wet\n    return np.clip(v_P / (v_P + v_R_wet), 0.0, 0.95)\n\n\ndef inactivation_rate(Cn, cp: CellParams):\n    \"\"\"Active-biomass inactivation; rises sharply when nitrogen is fully absent.\"\"\"\n    return cp.b_dec0 + cp.b_decN * cp.K_Nv / (Cn + cp.K_Nv)\n\n\ndef specific_rates(Cs, Cn, Cx, Cp, cp: CellParams, burden_frac=0.0, phi_a=1.0):\n    \"\"\"mu_xs, mu_xp, mu_ps after Eqs (6)-(8) of the DPM.\"\"\"\n    Cx = np.maximum(Cx, 1e-9)\n    fP = np.clip(Cp / Cx, 0.0, cp.fP_max * 0.999)\n\n    gate_S = Cs / (cp.K_S + Cs + Cs**2 / cp.K_IS)\n    gate_N = Cn / (cp.K_N + Cn + Cn**2 / cp.K_IN)\n    gate_X = max(0.0, 1.0 - (Cx / cp.Cx_max) ** cp.alpha)\n\n    scale = max(0.0, 1.0 - burden_frac)\n\n    mu_xs = cp.mu_xs_max * scale * phi_a * gate_S * gate_N * gate_X\n    mu_xp = cp.mu_xp_max * scale * (fP / (cp.K_P + fP)) * gate_N * gate_X\n\n    gate_Nstarve = cp.K_PIN / (Cn + cp.K_PIN)\n    gate_PS = Cs / (cp.K_PS + Cs + Cs**2 / cp.K_PIS)\n    gate_sat = max(0.0, 1.0 - (fP / cp.fP_max) ** cp.beta)\n    mu_ps = cp.mu_ps_max * scale * phi_a * gate_Nstarve * gate_PS * gate_sat\n\n    return mu_xs, mu_xp, mu_ps, fP\n\n\ndef rhs(t, y, cp: CellParams, bp: BESParams, qp: QuantumParams, Jcal,\n        control, log=None):\n    \"\"\"Right-hand side of the coupled cellular system.\n\n    y = [Cs, Cn, Cx, Cp, G, Csens, V, M_res, phi_a]\n    \"\"\"\n    Cs, Cn, Cx, Cp, G, Csens, V, M_res, phi_a = y\n    phi_a = float(np.clip(phi_a, 0.0, 1.0))\n    Cs = max(Cs, 0.0); Cn = max(Cn, 0.0); Cx = max(Cx, 1e-9)\n    Cp = max(Cp, 0.0); G = max(G, 0.0); Csens = max(Csens, 0.0)\n    V = max(V, 1e-6); M_res = max(M_res, 0.0)\n\n    c_sens_specific = Csens / Cx\n    burden_frac = cp.burden * c_sens_specific\n\n    mu_xs, mu_xp, mu_ps, fP = specific_rates(Cs, Cn, Cx, Cp, cp, burden_frac, phi_a)\n    mu_x = mu_xs + mu_xp\n\n    # Control action: carbon feed, nitrogen feed, BES applied potential\n    F_S, F_N, V_app = control(t, y)\n\n    # The fermenter cannot draw carbon the BES has not yet made\n    if M_res <= 0.0:\n        F_S = min(F_S, bes_formate_rate(V_app, bp.S_cod_anode, bp) / cp.C_SF)\n    F_S = max(F_S, 0.0)\n\n    R_form = bes_formate_rate(V_app, bp.S_cod_anode, bp)      # g/h\n    dM_res = R_form - F_S * cp.C_SF\n    if M_res >= bp.M_res_max and dM_res > 0:\n        dM_res = 0.0                                          # reservoir full, vent/idle\n\n    F_tot = F_S + F_N\n    D = F_tot / V\n\n    # Substrate (Eq. 1): feed - dilution - growth/product/maintenance demand\n    q_S = (mu_xs / cp.Y_xs + mu_ps / cp.Y_pi + cp.m_s)\n    dCs = F_S * cp.C_SF / V - D * Cs - q_S * Cx\n\n    # Nitrogen (Eq. 2)\n    q_N = (mu_xs + mu_xp) / cp.Y_xN\n    dCn = F_N * cp.C_NF / V - D * Cn - q_N * Cx\n\n    # Biomass (Eq. 3) and PHA (Eq. 4)\n    dCx = (mu_xs + mu_xp - D) * Cx\n    dCp = (mu_ps - mu_xp / cp.Y_xp) * Cx - D * Cp\n\n    # 2-oxoglutarate node: produced with carbon flux, drained by GS-GOGAT\n    v_prod = cp.k_G * q_S + cp.G_basal\n    v_gogat = cp.V_GS * (G / (cp.K_G + G)) * (Cn / (cp.K_NG + Cn))\n    dG = v_prod - v_gogat - (cp.k_Gdeg + mu_x) * G\n\n    # Sensor: constitutive expression, growth dilution, photobleaching\n    dCsens = cp.k_exp * Cx - (mu_x + cp.k_bleach * qp.I_exc) * Csens\n\n    dV = F_tot\n\n    # Active fraction: lost to starvation-driven inactivation, restored by the\n    # dilution of inactive material through new growth on nitrogen\n    b_dec = inactivation_rate(Cn, cp)\n    dphi_a = -b_dec * phi_a + mu_xs * (1.0 - phi_a)\n\n    return np.array([dCs, dCn, dCx, dCp, dG, dCsens, dV, dM_res, dphi_a])\n\n\n# ============================================================================\n# SOLVER: co-simulation with adiabatic elimination of the quantum layer\n# ============================================================================\n\ndef rk4_step(f, t, y, h, *args, **kw):\n    k1 = f(t, y, *args, **kw)\n    k2 = f(t + 0.5 * h, y + 0.5 * h * k1, *args, **kw)\n    k3 = f(t + 0.5 * h, y + 0.5 * h * k2, *args, **kw)\n    k4 = f(t + h, y + h * k3, *args, **kw)\n    return y + (h / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)\n\n\n@dataclass\nclass Controller:\n    \"\"\"Closed-loop nitrogen feeding driven by the estimated 2-OG signal.\"\"\"\n    mode: str = \"closed_multiscale\"  # open | closed_raw | closed_od | closed_multiscale\n    G_set: float = 0.122           # mM target 2-OG during accumulation\n    Cn_set: float = 0.400          # g/L nitrogen setpoint during the growth phase\n    Kc_N: float = 0.0060           # (L/h) per (g/L) nitrogen error\n    tau_IN: float = 4.0            # h\n    t_switch: float = 24.0         # h, open-loop switch time\n    F_N_max: float = 0.00300       # L/h\n    Kc: float = 0.00090            # proportional gain, L/h per mM\n    tau_I: float = 3.0             # h, integral time\n    V_app: float = 0.90            # V, nominal applied potential\n    V_app_min: float = 0.70\n    V_app_max: float = 1.05\n    Cs_set: float = 0.45           # g/L formate setpoint (maximises the Haldane gate)\n    F_S_max: float = 0.060         # L/h maximum carbon feed\n    Kc_S: float = 0.030            # (L/h) per (g/L) formate error\n    tau_IS: float = 1.0            # h\n    M_res_set: float = 60.0        # g, formate buffer level setpoint\n    Kc_V: float = 0.004            # V per g of reservoir error\n    tau_IV: float = 10.0           # h\n    Cx_target: float = 7.0         # g/L, biomass handover target\n    noise_sd: float = 0.02         # fractional measurement noise on the ratio\n    _integral: float = field(default=0.0, repr=False)\n    _last_t: float = field(default=0.0, repr=False)\n    _Ghat: float = field(default=0.0, repr=False)\n    _phase: int = field(default=0, repr=False)\n    _integral_S: float = field(default=0.0, repr=False)\n    _integral_V: float = field(default=0.0, repr=False)\n    _integral_N: float = field(default=0.0, repr=False)\n\n\ndef make_control(ctrl: Controller, cp: CellParams, qp: QuantumParams, Jcal, rng):\n    \"\"\"Build the control callback. This is where Q -> C closure happens.\"\"\"\n\n    def carbon_feed(Cs, dt):\n        \"\"\"Substrate-stat: hold residual formate below the inhibition knee.\"\"\"\n        err = ctrl.Cs_set - Cs\n        ctrl._integral_S += err * dt\n        ctrl._integral_S = np.clip(ctrl._integral_S, -0.5, 0.5)\n        u = ctrl.Kc_S * (err + ctrl._integral_S / ctrl.tau_IS)\n        return float(np.clip(u, 0.0, ctrl.F_S_max))\n\n    def bes_potential(M_res, dt):\n        \"\"\"Hold the formate buffer near its level setpoint.\"\"\"\n        err = ctrl.M_res_set - M_res\n        ctrl._integral_V += err * dt\n        ctrl._integral_V = np.clip(ctrl._integral_V, -300.0, 300.0)\n        v = ctrl.V_app + ctrl.Kc_V * (err + ctrl._integral_V / ctrl.tau_IV)\n        return float(np.clip(v, ctrl.V_app_min, ctrl.V_app_max))\n\n    def control(t, y):\n        Cs, Cn, Cx, Cp, G, Csens, V, M_res, phi_a = y\n        dt = max(t - ctrl._last_t, 0.0)\n        ctrl._last_t = t\n\n        F_S = carbon_feed(Cs, dt)\n        V_app = bes_potential(M_res, dt)\n\n        if ctrl.mode == \"open\":\n            # Fair open-loop baseline: the growth phase is regulated exactly as in\n            # the closed-loop cases (an N-stat, which is normal practice), and the\n            # ONLY difference is that nitrogen is cut on a clock rather than on the\n            # measured 2-oxoglutarate. This isolates the single decision compared.\n            if t >= ctrl.t_switch:\n                return F_S, 0.0, V_app\n            errN = ctrl.Cn_set - Cn\n            ctrl._integral_N += errN * dt\n            ctrl._integral_N = np.clip(ctrl._integral_N, -5.0, 5.0)\n            uN = ctrl.Kc_N * (errN + ctrl._integral_N / ctrl.tau_IN)\n            return F_S, float(np.clip(uN, 0.0, ctrl.F_N_max)), V_app\n\n        # --- measurement: the cells report through the quantum layer ---\n        phi_P = granule_volume_fraction(Cx, Cp, cp)\n        qm = quantum_map(max(G, 0.0), phi_P, qp, Jcal, Cx=Cx, Cp=Cp)\n        Rt = qm[\"Rt\"]\n        if ctrl.noise_sd > 0:\n            Rt = Rt * (1.0 + rng.normal(0.0, ctrl.noise_sd))\n\n        # --- inversion at the chosen level of multiscale correction ---\n        level = {\"closed_raw\": \"none\", \"closed_od\": \"od_only\",\n                 \"closed_multiscale\": \"full\"}[ctrl.mode]\n        Ghat, _, _ = invert_quantum_map(Rt, phi_P, qp, Jcal, Cx=Cx, Cp=Cp,\n                                        correction=level)\n        ctrl._Ghat = Ghat\n\n        # --- phase logic + PI on the 2-OG setpoint ---\n        if ctrl._phase == 0 and Cx >= ctrl.Cx_target:\n            ctrl._phase = 1\n\n        if ctrl._phase == 0:\n            # Growth phase: N-stat holds nitrogen at a low, non-limiting level so\n            # that control authority is available as soon as the phase changes.\n            errN = ctrl.Cn_set - Cn\n            ctrl._integral_N += errN * dt\n            ctrl._integral_N = np.clip(ctrl._integral_N, -5.0, 5.0)\n            uN = ctrl.Kc_N * (errN + ctrl._integral_N / ctrl.tau_IN)\n            return F_S, float(np.clip(uN, 0.0, ctrl.F_N_max)), V_app\n\n        err = ctrl.G_set - Ghat\n        ctrl._integral += err * dt\n        ctrl._integral = np.clip(ctrl._integral, -40.0, 40.0)\n        u = -ctrl.Kc * (err + ctrl._integral / ctrl.tau_I)\n        F_N = float(np.clip(u, 0.0, ctrl.F_N_max))\n        return F_S, F_N, V_app\n\n    return control\n\n\ndef simulate(cp: CellParams, bp: BESParams, qp: QuantumParams, ctrl: Controller,\n             t_end=60.0, dt=0.01, y0=None, seed=0):\n    Jcal = spectral_overlap_density(qp)\n    rng = np.random.default_rng(seed)\n    control = make_control(ctrl, cp, qp, Jcal, rng)\n\n    if y0 is None:\n        y0 = np.array([1.00, 0.60, 0.50, 0.005, 0.30, 0.0050, 1.0, bp.M_res0, 1.0])\n\n    n = int(round(t_end / dt))\n    ts = np.zeros(n + 1)\n    ys = np.zeros((n + 1, len(y0)))\n    aux = np.zeros((n + 1, 8))\n    ts[0], ys[0] = 0.0, y0\n\n    y = y0.copy()\n    for i in range(n):\n        t = i * dt\n        y = rk4_step(rhs, t, y, dt, cp, bp, qp, Jcal, control)\n        y = np.maximum(y, np.array([0, 0, 1e-9, 0, 0, 0, 1e-6, 0, 0]))\n        y[8] = min(y[8], 1.0)\n        ts[i + 1], ys[i + 1] = t + dt, y\n\n        Cs, Cn, Cx, Cp, G, Csens, V, M_res, phi_a = y\n        phi_P = granule_volume_fraction(Cx, Cp, cp)\n        qm = quantum_map(G, phi_P, qp, Jcal)\n        F_S, F_N, V_app = control(t + dt, y)\n        aux[i + 1] = [phi_P, qm[\"Rt\"], qm[\"E\"], qm[\"n_med\"],\n                      V_app, ctrl._Ghat if ctrl.mode != 'open' else np.nan,\n                      F_N, Cp / max(Cx, 1e-9)]\n\n    aux[0] = aux[1]\n    return dict(t=ts, y=ys, aux=aux, Jcal=Jcal,\n                labels=[\"Cs\", \"Cn\", \"Cx\", \"Cp\", \"G\", \"Csens\", \"V\", \"M_res\", \"phi_a\"],\n                aux_labels=[\"phi_P\", \"Rt\", \"E\", \"n_med\", \"V_app\", \"Ghat\",\n                            \"F_N\", \"fP\"])\n\n\n# ============================================================================\n# DIAGNOSTICS\n# ============================================================================\n\ndef metrics(res, cp: CellParams):\n    t, y = res[\"t\"], res[\"y\"]\n    Cs, Cn, Cx, Cp, G, Csens, V = [y[:, i] for i in range(7)]\n    mass_P = Cp * V\n    titre = Cp[-1]\n    prod = mass_P[-1] / (V[-1] * t[-1])\n    fP = Cp[-1] / max(Cx[-1], 1e-9)\n    # carbon fed via the BES over the run\n    phi_a = y[:, 8]\n    viable = phi_a[-1] * Cx[-1]\n    # Economic objective for a cell-recycle process: harvested polymer plus the\n    # value of viable catalyst carried into the next cycle (w in g PHA-equivalent\n    # per g viable residual biomass, i.e. the growth phase it saves).\n    w_recycle = 0.35\n    J = titre + w_recycle * viable\n    return dict(titre_PHA=titre, fP_final=fP, Cx_final=Cx[-1],\n                productivity=prod, mass_PHA=mass_P[-1], phi_a_final=phi_a[-1],\n                viable_biomass=viable, objective_J=J,\n                G_final=G[-1], residual_formate=Cs[-1])\n\n\ndef sensor_bias_scan(qp: QuantumParams, G_grid=None, phi_grid=None):\n    \"\"\"Systematic error in inferred 2-OG when granule loading is ignored.\"\"\"\n    Jcal = spectral_overlap_density(qp)\n    if G_grid is None:\n        G_grid = np.logspace(-2, 1.0, 120)\n    if phi_grid is None:\n        phi_grid = np.array([0.0, 0.10, 0.20, 0.30, 0.40, 0.50])\n    out = np.zeros((len(phi_grid), len(G_grid)))\n    for i, phi in enumerate(phi_grid):\n        qm = quantum_map(G_grid, phi, qp, Jcal)\n        Ghat, _, _ = invert_quantum_map(qm[\"Rt\"], phi, qp, Jcal, phi_assumed=0.0)\n        out[i] = (Ghat - G_grid) / G_grid * 100.0\n    return G_grid, phi_grid, out\n\n\ndef sensor_design_map(qp: QuantumParams, KD_grid=None, Rholo_grid=None,\n                      G_lo=0.25, G_hi=2.0, phi_op=0.35):\n    \"\"\"Design chart: sensitivity of the ratio to 2-OG across the operating window,\n    as a function of binding affinity and bound-state separation.\"\"\"\n    Jcal = spectral_overlap_density(qp)\n    if KD_grid is None:\n        KD_grid = np.logspace(-1.3, 0.7, 60)\n    if Rholo_grid is None:\n        Rholo_grid = np.linspace(36.0, 62.0, 60)\n    S = np.zeros((len(Rholo_grid), len(KD_grid)))\n    for i, Rh in enumerate(Rholo_grid):\n        for j, KD in enumerate(KD_grid):\n            q = QuantumParams(**{**asdict(qp), \"K_D\": float(KD), \"R_holo\": float(Rh)})\n            Jc = spectral_overlap_density(q)\n            r_lo = quantum_map(G_lo, phi_op, q, Jc)[\"Rt\"]\n            r_hi = quantum_map(G_hi, phi_op, q, Jc)[\"Rt\"]\n            S[i, j] = abs(r_hi - r_lo) / (0.5 * (r_hi + r_lo))\n    return KD_grid, Rholo_grid, S\n\n\nif __name__ == \"__main__\":\n    qp, cp, bp = QuantumParams(), CellParams(), BESParams()\n    Jcal = spectral_overlap_density(qp)\n    print(f\"calibrated overlap density Jcal = {Jcal:.3e} cm\")\n    print(f\"R0 (kappa2=2/3, n=1.33)       = {forster_R0(2/3, 1.33, qp):.2f} A\")\n    for mode, label in [(\"open\", \"open-loop\"),\n                        (\"closed_naive\", \"closed, naive calibration\"),\n                        (\"closed_quantum\", \"closed, multiscale corrected\")]:\n        ctrl = Controller(mode=mode)\n        res = simulate(cp, bp, qp, ctrl)\n        m = metrics(res, cp)\n        print(f\"{label:32s} PHA={m['titre_PHA']:6.2f} g/L  \"\n              f\"fP={m['fP_final']:5.3f}  prod={m['productivity']:6.4f} g/L/h\")\n\n\n# ==========================================================================\n# SCENARIO RUNNER (run_cases.py)\n# ==========================================================================\n\n\"\"\"Scenario runner: generates every number and figure datum used in the manuscript.\"\"\"\nimport json\nimport numpy as np\nfrom dataclasses import replace, asdict\nimport qcell_model as M\nfrom qcell_model import (QuantumParams, CellParams, BESParams, Controller,\n                         simulate, metrics, quantum_map, invert_quantum_map,\n                         spectral_overlap_density, forster_R0, granule_volume_fraction,\n                         lorentz_lorenz_mix, kappa2_effective, coulomb_coupling,\n                         krieger_dougherty, optical_attenuation, eet_rate)\n\nT_END = 96.0\nG_STAR = 0.16\nT_SWITCH_NOMINAL = 60.0\nMODES = [\"closed_raw\", \"closed_od\", \"closed_multiscale\"]\n\n\n# ------------------------------------------------------------------ runners\ndef run_clock(cp, bp, qp, t_switch=T_SWITCH_NOMINAL, t_end=T_END):\n    ctrl = Controller(mode=\"open\", t_switch=t_switch)\n    return simulate(cp, bp, qp, ctrl, t_end=t_end)\n\n\ndef run_closed(cp, bp, qp, mode, t_end=T_END, seed=0, G_set=G_STAR, noise=0.02):\n    ctrl = Controller(mode=mode, G_set=G_set)\n    ctrl.noise_sd = noise\n    return simulate(cp, bp, qp, ctrl, t_end=t_end, seed=seed)\n\n\ndef est_error(res):\n    t, y, a = res[\"t\"], res[\"y\"], res[\"aux\"]\n    mask = (t > 45) & (y[:, 4] > 1e-6) & np.isfinite(a[:, 5])\n    if mask.sum() == 0:\n        return np.nan\n    return float(np.mean((a[mask, 5] - y[mask, 4]) / y[mask, 4]) * 100)\n\n\n# -------------------------------------------------------------- experiments\ndef exp_photophysics(qp):\n    Jc = spectral_overlap_density(qp)\n    R0 = forster_R0(2 / 3, 1.33, qp)\n    J0 = coulomb_coupling(np.sqrt(2 / 3), R0, 1.33, qp)\n    k_gr, _ = eet_rate(2 / 3, R0, 1.33, qp, Jc, coherent=False)\n    theta0 = krieger_dougherty(0.0, qp.eta_cyto0) * qp.V_hydro / (1.380649e-23 * 298.15)\n    return dict(Jcal_cm=Jc, R0_ref_A=R0, J_at_R0_cm1=J0,\n                k_goldenrule_s=k_gr, k_forster_s=1.0 / qp.tau_D0,\n                theta_rot_ns=theta0 * 1e9,\n                kappa2_apo_eff=float(kappa2_effective(0.0, qp.kappa2_static_apo, qp)),\n                kappa2_holo_eff=float(kappa2_effective(0.0, qp.kappa2_static_holo, qp)))\n\n\ndef exp_sensor_curve(qp, phis=(0.0, 0.15, 0.30)):\n    Jc = spectral_overlap_density(qp)\n    G = np.logspace(-2.3, 0.8, 160)\n    out = {}\n    for phi in phis:\n        out[f\"{phi:.2f}\"] = quantum_map(G, phi, qp, Jc)[\"Rt\"].tolist()\n    return G.tolist(), out\n\n\ndef exp_drift(qp, cp, G_op=G_STAR):\n    \"\"\"Photophysical and transport drift along a representative trajectory.\"\"\"\n    Jc = spectral_overlap_density(qp)\n    rows = []\n    for fP in np.linspace(0.0, 0.75, 40):\n        Cx, Cp = 11.0, 11.0 * fP\n        phi = float(granule_volume_fraction(Cx, Cp, cp))\n        qm = quantum_map(G_op, phi, qp, Jc, Cx=Cx, Cp=Cp)\n        b = {}\n        for c in (\"none\", \"od_only\", \"full\"):\n            Gh, _, _ = invert_quantum_map(qm[\"Rt\"], phi, qp, Jc, Cx=Cx, Cp=Cp,\n                                          correction=c)\n            b[c] = 100 * (Gh - G_op) / G_op\n        rows.append([fP, phi, qm[\"n_med\"], qm[\"kappa2_holo\"], qm[\"R0_holo\"],\n                     qm[\"E\"], qm[\"ratio_drift\"], b[\"none\"], b[\"od_only\"], b[\"full\"]])\n    return np.array(rows)\n\n\ndef exp_switch_scan(cp, bp, qp):\n    out = []\n    for tsw in np.arange(16, 80, 4.0):\n        r = run_clock(cp, bp, qp, t_switch=float(tsw))\n        m = metrics(r, cp)\n        out.append([tsw, m[\"titre_PHA\"], m[\"fP_final\"], m[\"phi_a_final\"],\n                    m[\"objective_J\"], m[\"productivity\"]])\n    return np.array(out)\n\n\ndef exp_setpoint_scan(cp, bp, qp):\n    out = []\n    for gs in [0.10, 0.12, 0.14, 0.16, 0.18, 0.20, 0.24, 0.28, 0.34]:\n        r = run_closed(cp, bp, qp, \"closed_multiscale\", G_set=gs, noise=0.0)\n        m = metrics(r, cp)\n        out.append([gs, m[\"titre_PHA\"], m[\"fP_final\"], m[\"phi_a_final\"],\n                    m[\"objective_J\"]])\n    return np.array(out)\n\n\ndef exp_scattering_sensitivity(cp, bp, qp):\n    \"\"\"When is the full multiscale correction actually required?\n\n    Sweeps the granule scattering contrast a_P. OD normalisation corrects the\n    biomass term only, so its residual error grows with a_P.\n    \"\"\"\n    out = []\n    for aP in [0.0, 0.06, 0.12, 0.25, 0.40, 0.60, 0.90]:\n        qx = replace(qp, a_P=aP)\n        row = [aP]\n        for mode in MODES:\n            r = run_closed(cp, bp, qx, mode, noise=0.0)\n            m = metrics(r, cp)\n            row += [m[\"objective_J\"], m[\"titre_PHA\"], est_error(r)]\n        out.append(row)\n    return np.array(out)\n\n\ndef exp_robustness(cp, bp, qp):\n    perturbations = [\n        (\"nominal\", {}),\n        (\"mu_max -30%\", {\"mu_xs_max\": cp.mu_xs_max * 0.70}),\n        (\"mu_max +30%\", {\"mu_xs_max\": cp.mu_xs_max * 1.30}),\n        (\"Y_xs -20%\", {\"Y_xs\": cp.Y_xs * 0.80}),\n        (\"Y_xs +20%\", {\"Y_xs\": cp.Y_xs * 1.20}),\n        (\"mu_ps -25%\", {\"mu_ps_max\": cp.mu_ps_max * 0.75}),\n        (\"K_IS -40%\", {\"K_IS\": cp.K_IS * 0.60}),\n    ]\n    rows = []\n    for name, kw in perturbations:\n        cpx = replace(cp, **kw)\n        e = dict(case=name)\n        e[\"clock\"] = metrics(run_clock(cpx, bp, qp), cpx)[\"objective_J\"]\n        for mode in MODES:\n            e[mode] = metrics(run_closed(cpx, bp, qp, mode), cpx)[\"objective_J\"]\n        rows.append(e)\n    return rows\n\n\ndef exp_mc(cp, bp, qp, n=40, seed=1):\n    rng = np.random.default_rng(seed)\n    res = {k: [] for k in [\"clock\"] + MODES}\n    for i in range(n):\n        cpx = replace(\n            cp,\n            mu_xs_max=cp.mu_xs_max * float(rng.uniform(0.70, 1.30)),\n            mu_ps_max=cp.mu_ps_max * float(rng.uniform(0.75, 1.25)),\n            Y_xs=cp.Y_xs * float(rng.uniform(0.80, 1.20)),\n            K_IS=cp.K_IS * float(rng.uniform(0.60, 1.40)),\n            b_decN=cp.b_decN * float(rng.uniform(0.7, 1.3)),\n        )\n        res[\"clock\"].append(metrics(run_clock(cpx, bp, qp), cpx)[\"objective_J\"])\n        for mode in MODES:\n            res[mode].append(metrics(run_closed(cpx, bp, qp, mode, seed=i), cpx)[\"objective_J\"])\n    return {k: np.array(v) for k, v in res.items()}\n\n\ndef exp_design_map(qp, G_lo=0.06, G_hi=0.45, phi_op=0.20):\n    KD = np.logspace(-2.0, 0.3, 40)\n    Rh = np.linspace(38.0, 64.0, 40)\n    S = np.zeros((len(Rh), len(KD)))\n    for i, r in enumerate(Rh):\n        for j, kd in enumerate(KD):\n            q = replace(qp, K_D=float(kd), R_holo=float(r))\n            Jc = spectral_overlap_density(q)\n            a = quantum_map(G_lo, phi_op, q, Jc)[\"Rt\"]\n            b = quantum_map(G_hi, phi_op, q, Jc)[\"Rt\"]\n            S[i, j] = abs(b - a) / (0.5 * (a + b))\n    return KD, Rh, S\n\n\n# ------------------------------------------------------------------- driver\ndef main():\n    qp, cp, bp = QuantumParams(), CellParams(), BESParams()\n    store = {}\n\n    pp = exp_photophysics(qp)\n    store[\"photophysics\"] = pp\n    print(\"PHOTOPHYSICS\")\n    for k, v in pp.items():\n        print(f\"  {k:20s} {v:.5g}\")\n\n    print(\"\\nSWITCH-TIME SCAN (clock control)\")\n    sc = exp_switch_scan(cp, bp, qp)\n    store[\"switch_scan\"] = sc.tolist()\n    for r in sc:\n        print(\"  t=%5.1f  PHA=%6.3f fP=%5.3f phi_a=%5.3f J=%6.3f\" % tuple(r[:5]))\n    print(f\"  best clock: t={sc[np.argmax(sc[:,4]),0]:.1f} J={sc[:,4].max():.3f}\")\n\n    print(\"\\nSETPOINT SCAN (closed loop)\")\n    sp = exp_setpoint_scan(cp, bp, qp)\n    store[\"setpoint_scan\"] = sp.tolist()\n    for r in sp:\n        print(\"  G*=%5.3f  PHA=%6.3f fP=%5.3f phi_a=%5.3f J=%6.3f\" % tuple(r))\n\n    print(\"\\nTRAJECTORIES\")\n    traj = {}\n    r = run_clock(cp, bp, qp)\n    traj[\"clock\"] = dict(t=r[\"t\"][::50].tolist(), y=r[\"y\"][::50].tolist(),\n                         aux=r[\"aux\"][::50].tolist())\n    print(f\"  clock              J={metrics(r,cp)['objective_J']:.3f} \"\n          f\"PHA={metrics(r,cp)['titre_PHA']:.3f}\")\n    for mode in MODES:\n        r = run_closed(cp, bp, qp, mode)\n        m = metrics(r, cp)\n        traj[mode] = dict(t=r[\"t\"][::50].tolist(), y=r[\"y\"][::50].tolist(),\n                          aux=r[\"aux\"][::50].tolist())\n        print(f\"  {mode:18s} J={m['objective_J']:.3f} PHA={m['titre_PHA']:.3f} \"\n              f\"fP={m['fP_final']:.3f} est.err={est_error(r):+.2f}%\")\n    store[\"trajectories\"] = traj\n\n    print(\"\\nDRIFT ALONG ACCUMULATION\")\n    dr = exp_drift(qp, cp)\n    store[\"drift\"] = dr.tolist()\n    for r in dr[::8]:\n        print(\"  fP=%4.2f phi=%5.3f n=%6.4f R0=%5.2f drift=%6.4f \"\n              \"bias none/od/full = %+6.2f / %+5.2f / %+5.2f %%\"\n              % (r[0], r[1], r[2], r[4], r[6], r[7], r[8], r[9]))\n\n    print(\"\\nSCATTERING-CONTRAST SENSITIVITY (a_P)\")\n    ss = exp_scattering_sensitivity(cp, bp, qp)\n    store[\"scattering\"] = ss.tolist()\n    print(\"   a_P    J_raw  J_od   J_ms   | err_raw err_od  err_ms\")\n    for r in ss:\n        print(f\"  {r[0]:5.2f}  {r[1]:6.3f} {r[4]:6.3f} {r[7]:6.3f}  | \"\n              f\"{r[3]:+7.2f} {r[6]:+7.2f} {r[9]:+7.2f}\")\n\n    print(\"\\nROBUSTNESS\")\n    rb = exp_robustness(cp, bp, qp)\n    store[\"robustness\"] = rb\n    hdr = f\"  {'case':14s} {'clock':>8s}\" + \"\".join(f\"{m.replace('closed_',''):>12s}\" for m in MODES)\n    print(hdr)\n    for e in rb:\n        print(f\"  {e['case']:14s} {e['clock']:8.3f}\" +\n              \"\".join(f\"{e[m]:12.3f}\" for m in MODES))\n\n    print(\"\\nMONTE CARLO\")\n    mc = exp_mc(cp, bp, qp)\n    store[\"monte_carlo\"] = {k: v.tolist() for k, v in mc.items()}\n    for k, v in mc.items():\n        print(f\"  {k:18s} mean={v.mean():6.3f} sd={v.std():5.3f} \"\n              f\"p10={np.percentile(v,10):6.3f} min={v.min():6.3f}\")\n\n    print(\"\\nDESIGN MAP\")\n    KD, Rh, S = exp_design_map(qp)\n    store[\"design_map\"] = dict(KD=KD.tolist(), Rh=Rh.tolist(), S=S.tolist())\n    i, j = np.unravel_index(np.argmax(S), S.shape)\n    print(f\"  best: K_D={KD[j]:.4f} mM  R_holo={Rh[i]:.1f} A  sensitivity={S[i,j]:.3f}\")\n\n    gg, curves = exp_sensor_curve(qp)\n    store[\"sensor_curve\"] = dict(G=gg, curves=curves)\n\n    with open(\"results.json\", \"w\") as f:\n        json.dump(store, f)\n    print(\"\\nwrote results.json\")\n\n\nif __name__ == \"__main__\":\n    main()\n";
+/* source view */
+function showSource(){
+  const s=document.querySelectorAll("script");
+  const txt=s[s.length-1].textContent;
+  el("src").textContent=txt.slice(txt.indexOf("const C_LIGHT"),
+      txt.indexOf("/* ------------------------------------------------------------------ plots */"));
+}
+el("copyjs").addEventListener("click",async()=>{
+  try{await navigator.clipboard.writeText(el("src").textContent);
+    el("copystat").textContent="JavaScript model copied to the clipboard.";}
+  catch(e){const r=document.createRange();r.selectNodeContents(el("src"));
+    const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);
+    el("copystat").textContent="Press Ctrl/Cmd+C to copy the selected source.";}
+});
+el("copypy").addEventListener("click",async()=>{
+  try{await navigator.clipboard.writeText(PY_SRC);
+    el("copystat").textContent="Python reference implementation copied to the clipboard.";}
+  catch(e){el("src").textContent=PY_SRC;
+    el("copystat").textContent="Clipboard unavailable — the Python source is shown below; select and copy.";}
+});
+showSource();
+runOne();
+</script>

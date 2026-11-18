@@ -1,0 +1,514 @@
+<title>Quantum Layer, Plainly</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column; each equation is a card with the symbols on the
+   left rail and plain English filling the measure. Donor cyan and acceptor amber
+   are used semantically throughout — they are the two real emission bands. */
+:root{
+  --paper:#faf7f2; --card:#ffffff; --ink:#1d2328; --soft:#5d6a72; --rule:#e2dbd0;
+  --donor:#0f7d8f; --acceptor:#b8791a; --flag:#a8392f;
+  --wash:#f2ede4; --badge:#eceadf;
+  --display:"Fraunces",Georgia,serif;
+  --body:"Source Sans 3",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#15191c; --card:#1c2226; --ink:#e8eef1; --soft:#9fb0b9; --rule:#2e383e;
+  --donor:#44c2d6; --acceptor:#e8b256; --flag:#ef8277;
+  --wash:#1a2024; --badge:#242c31; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --paper:#15191c; --card:#1c2226; --ink:#e8eef1; --soft:#9fb0b9; --rule:#2e383e;
+  --donor:#44c2d6; --acceptor:#e8b256; --flag:#ef8277;
+  --wash:#1a2024; --badge:#242c31; color-scheme:dark;}
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);
+  margin:0;line-height:1.62;font-size:16px}
+.wrap{max-width:720px;margin:0 auto;padding-inline:20px;padding-block:40px 72px}
+
+h1{font-family:var(--display);font-weight:600;font-size:clamp(1.9rem,5vw,2.6rem);
+  line-height:1.12;margin:0 0 14px;text-wrap:balance;letter-spacing:-.015em}
+.standfirst{font-size:1.06rem;color:var(--soft);margin:0 0 8px;max-width:60ch}
+.meta{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--soft);margin-top:20px}
+
+h2{font-family:var(--display);font-weight:600;font-size:1.35rem;margin:52px 0 6px;
+  line-height:1.2;text-wrap:balance}
+h2 .n{font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;display:block;
+  color:var(--donor);text-transform:uppercase;margin-bottom:5px;font-weight:500}
+.lede{color:var(--soft);margin:0 0 20px;max-width:62ch}
+
+.primer{background:var(--wash);border:1px solid var(--rule);border-radius:10px;
+  padding:22px 24px;margin:28px 0 8px}
+.primer h3{font-family:var(--display);font-size:1.1rem;margin:0 0 10px;font-weight:600}
+.primer p{margin:0 0 12px}
+.primer p:last-child{margin-bottom:0}
+
+.eq{background:var(--card);border:1px solid var(--rule);border-radius:10px;
+  padding:20px 22px;margin:16px 0}
+.eq header{display:flex;gap:12px;align-items:baseline;margin-bottom:12px;flex-wrap:wrap}
+.tag{font-family:var(--mono);font-size:.7rem;font-weight:500;letter-spacing:.04em;
+  background:var(--badge);color:var(--soft);border-radius:4px;padding:3px 8px;
+  white-space:nowrap}
+.eq h4{font-size:1rem;font-weight:600;margin:0;flex:1 1 260px;min-width:0}
+
+.math{font-family:var(--mono);font-size:.94rem;background:var(--wash);
+  border-left:3px solid var(--donor);border-radius:0 6px 6px 0;
+  padding:12px 16px;margin:0 0 14px;overflow-x:auto;white-space:nowrap;
+  color:var(--ink)}
+.words{font-family:var(--body);font-size:.93rem;background:transparent;
+  border-left:3px solid var(--acceptor);padding:4px 0 4px 14px;margin:0 0 14px;
+  color:var(--soft);font-style:italic}
+.eq p{margin:0 0 11px}
+.eq p:last-child{margin-bottom:0}
+.why{font-size:.93rem;color:var(--soft);border-top:1px solid var(--rule);
+  padding-top:11px;margin-top:13px}
+.why b{color:var(--ink);font-weight:600}
+
+.key{border-color:var(--flag);border-width:1.5px}
+.key .math{border-left-color:var(--flag)}
+.key .tag{background:var(--flag);color:#fff}
+
+.callout{background:var(--wash);border:1px solid var(--rule);
+  border-left:4px solid var(--flag);border-radius:0 10px 10px 0;
+  padding:20px 22px;margin:26px 0}
+.callout h3{font-family:var(--display);font-size:1.12rem;margin:0 0 10px;font-weight:600}
+.callout p{margin:0 0 12px}
+.callout p:last-child{margin-bottom:0}
+
+sub,sup{font-size:.72em;line-height:0}
+.d{color:var(--donor);font-weight:600}
+.a{color:var(--acceptor);font-weight:600}
+em.term{font-style:normal;border-bottom:1.5px dotted var(--soft);cursor:help}
+
+.toc{display:flex;flex-wrap:wrap;gap:7px;margin:26px 0 0;padding:0;list-style:none}
+.toc a{font-family:var(--mono);font-size:.72rem;text-decoration:none;color:var(--soft);
+  border:1px solid var(--rule);border-radius:20px;padding:5px 12px;display:inline-block}
+.toc a:hover,.toc a:focus-visible{border-color:var(--donor);color:var(--donor)}
+a:focus-visible{outline:2px solid var(--donor);outline-offset:3px}
+hr{border:0;border-top:1px solid var(--rule);margin:44px 0 0}
+.foot{font-size:.86rem;color:var(--soft);margin-top:18px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+
+<h1>The quantum layer, in plain words</h1>
+<p class="standfirst">Twenty equations describe how a molecular sensor turns an
+invisible chemical signal into light a machine can read — and how the cell quietly
+corrupts that reading as it fills with plastic. Here is what each one says, without
+the physics.</p>
+<p class="meta">Methods equations 1–20 · no prior physics or biology assumed</p>
+
+<ul class="toc">
+  <li><a href="#picture">The big picture</a></li>
+  <li><a href="#talk">1–2 · Talking</a></li>
+  <li><a href="#often">3–7 · How often</a></li>
+  <li><a href="#quantum">8 · Quantum check</a></li>
+  <li><a href="#binding">9–10 · Binding</a></li>
+  <li><a href="#drift">11–13 · The drift</a></li>
+  <li><a href="#machine">14–18 · What the machine sees</a></li>
+  <li><a href="#back">19–20 · Working backwards</a></li>
+</ul>
+
+<section id="picture">
+<div class="primer">
+<h3>Before any equations: what is actually going on</h3>
+<p>Picture two tiny lamps bolted to opposite ends of a molecular spring, all of it
+floating inside a living cell. Shine blue light on the <span class="d">first lamp</span>
+and it lights up. But it has a choice: it can glow blue itself, or it can hand its
+energy silently across to the <span class="a">second lamp</span>, which then glows
+yellow-green instead.</p>
+<p>How often it hands over depends almost entirely on <strong>how close the two lamps
+are</strong>. Squeeze the spring and handovers become common — you see less blue, more
+yellow. Stretch it and the opposite happens.</p>
+<p>Now the useful part. The spring is a protein that <strong>changes shape when it
+grabs the chemical we care about</strong> — a molecule called 2-oxoglutarate, which
+is the cell's internal signal that it is running short of nitrogen. More of that
+chemical, more grabbing, different spring shape, different colour mix.</p>
+<p>So: <strong>measure the ratio of yellow to blue, and you have measured a chemical
+you cannot see.</strong> That is the entire idea. The twenty equations below are what
+it takes to make that measurement trustworthy — and equations 16–18 are where it
+goes wrong.</p>
+</div>
+</section>
+
+<h2 id="talk"><span class="n">Equations 1–2</span>How loudly can one lamp talk to the other?</h2>
+<p class="lede">Before energy can move, the two lamps have to be able to sense each
+other at all. These two equations put a number on that.</p>
+
+<div class="eq">
+  <header><span class="tag">Eq 1</span><h4>The strength of the connection</h4></header>
+  <div class="math">J  ∝  (κ × μ<sub>D</sub> × μ<sub>A</sub>) ÷ (n² × R³)</div>
+  <div class="words">connection strength = alignment × lamp-1 power × lamp-2 power,
+    divided by how dense the surroundings are, and by distance cubed</div>
+  <p>Four things set how strongly the lamps feel each other. Two are properties of
+  the lamps themselves (<strong>μ<sub>D</sub></strong>, <strong>μ<sub>A</sub></strong>
+  — essentially how powerful each one is as a transmitter). One is <strong>how they
+  are angled</strong> relative to each other (κ, equation 2). And one is
+  <strong>distance</strong>, R.</p>
+  <p>Distance enters as <em>R cubed</em>, which is brutal. Move the lamps twice as far
+  apart and the connection drops not by half but by a factor of eight. There is also
+  <strong>n²</strong> on the bottom: the stuff between the lamps muffles the signal,
+  and denser stuff muffles it more. Hold on to that — it is how the cell's plastic
+  eventually spoils everything.</p>
+  <p class="why"><b>Why it's here:</b> it is the foundation. Everything downstream is
+  a consequence of this number.</p>
+</div>
+
+<div class="eq">
+  <header><span class="tag">Eq 2</span><h4>The alignment factor</h4></header>
+  <div class="math">κ = (how the two lamps point relative to each other),  κ² ranges 0 → 4</div>
+  <div class="words">two aerials pointing the same way talk well; at right angles
+    they barely talk at all</div>
+  <p>Think of two radio aerials. Line them up and the signal is strong. Turn one
+  through ninety degrees and it can fall to nothing. κ is the number that captures
+  that geometry, and it can swing the connection strength by a factor of four either
+  way.</p>
+  <p class="why"><b>Why it's here:</b> almost every paper in this field assumes κ²
+  settles at an average value of about 0.67 because the lamps spin freely. Equation 11
+  shows that assumption is wrong here, which is one of the paper's quieter findings.</p>
+</div>
+
+<h2 id="often"><span class="n">Equations 3–7</span>From "they can talk" to "how often energy actually jumps"</h2>
+<p class="lede">Being able to talk is not the same as talking. These equations convert
+connection strength into an actual rate, and then into the fraction of energy that
+makes the trip.</p>
+
+<div class="eq">
+  <header><span class="tag">Eq 3</span><h4>The jump rate</h4></header>
+  <div class="math">rate  =  4π²c × J²  ×  𝒥</div>
+  <div class="words">how often energy jumps = (connection strength, squared) ×
+    (how well the two lamps' colours match)</div>
+  <p>Two factors, multiplied. The first is the connection from equation 1,
+  <strong>squared</strong> — so doubling the connection makes energy jump four times
+  as often. The second, 𝒥, is a colour-matching score explained next.</p>
+  <p class="why"><b>Why it's here:</b> this is the engine of the whole model. In
+  physics it is called a "golden rule" expression, which is just a standard recipe for
+  turning a coupling into a rate.</p>
+</div>
+
+<div class="eq">
+  <header><span class="tag">Eq 4</span><h4>The colour-match score</h4></header>
+  <div class="math">𝒥 = overlap between (colours lamp 1 emits) and (colours lamp 2 absorbs)</div>
+  <div class="words">a radio only receives if it is tuned to the transmitter's frequency</div>
+  <p>Energy will not transfer unless the second lamp can accept the exact colours the
+  first lamp gives out. Each lamp works across a <em>range</em> of colours, so this is
+  the overlap between two curves — the shaded area where "what I emit" and "what you
+  can absorb" coincide.</p>
+  <p>Both curves are scaled to enclose the same total area first, so the score measures
+  <strong>match alone</strong>, not brightness. A perfectly tuned pair scores high even
+  if both lamps are dim.</p>
+  <p class="why"><b>Why it's here:</b> it is the one ingredient that cannot be measured
+  directly in this setup, so equation 6 pins it down by a consistency argument.</p>
+</div>
+
+<div class="eq">
+  <header><span class="tag">Eq 5</span><h4>The half-way distance</h4></header>
+  <div class="math">R<sub>0</sub> = 0.211 × (κ² × n<sup>−4</sup> × Φ<sub>D</sub> × J<sub>ov</sub>)<sup>1/6</sup>  ångström</div>
+  <div class="words">the separation at which energy transfers exactly half the time</div>
+  <p>Rather than carry four separate properties around, the field collapses them into
+  one summary number: the distance at which the handover succeeds 50 % of the time.
+  Typically a few nanometres — a few millionths of a millimetre. For our pair it works
+  out at about 5.9 nm.</p>
+  <p>Notice what is inside: <strong>alignment</strong> (κ²), <strong>the surrounding
+  medium</strong> (n), <strong>how good a glower the first lamp is</strong>
+  (Φ<sub>D</sub>), and <strong>colour match</strong> (J<sub>ov</sub>). Every one of
+  those is normally treated as a fixed property of the sensor. In a cell filling with
+  plastic, two of them are not.</p>
+  <p class="why"><b>Why it's here:</b> it is the yardstick. "Half-way distance" is how
+  everyone in the field quotes sensor performance.</p>
+</div>
+
+<div class="eq">
+  <header><span class="tag">Eq 6</span><h4>A consistency check, not a fudge</h4></header>
+  <div class="math">𝒥 = 1 ÷ (4π²c × J(R<sub>0</sub>)² × τ<sub>D</sub>)</div>
+  <div class="words">two different routes to the same answer must agree — forcing them
+    to agree reveals the one number we did not know</div>
+  <p>There are two ways to calculate the jump rate: the connection-strength route
+  (equation 3) and the traditional half-way-distance route (equations 5 and 7). They
+  describe the same physics, so they must give the same answer. Demanding that they do
+  determines 𝒥 exactly.</p>
+  <p>The answer that falls out corresponds to a colour-overlap width of about 910 in
+  the field's units — squarely in the range you would expect for two proteins of this
+  kind. <strong>Getting a sensible number from a calculation that could have produced
+  anything is evidence the whole layer is built correctly.</strong></p>
+  <p class="why"><b>Why it's here:</b> it is a check, not a fitted parameter. Nothing
+  was tuned to make the results come out well.</p>
+</div>
+
+<div class="eq">
+  <header><span class="tag">Eq 7</span><h4>What fraction actually makes it across</h4></header>
+  <div class="math">E = 1 ÷ [ 1 + (R ÷ R<sub>0</sub>)<sup>6</sup> ]</div>
+  <div class="words">at the half-way distance, half gets across; a little closer and
+    almost all does; a little further and almost none</div>
+  <p>The number six in that exponent is what makes this technique work. Distance enters
+  to the <em>sixth power</em>, so the response is extraordinarily steep: move the lamps
+  20 % further apart and transfer drops by roughly two-thirds.</p>
+  <p>That steepness is the reason a colour ratio can report a shape change far too small
+  for any microscope to see. It is often called a "molecular ruler", and the nickname
+  is earned.</p>
+  <p class="why"><b>Why it's here:</b> this is the quantity the instrument is ultimately
+  measuring, and the quantity equations 19–20 work backwards from.</p>
+</div>
+
+<h2 id="quantum"><span class="n">Equation 8</span>The genuinely quantum bit — and why it turns out not to matter</h2>
+
+<div class="eq">
+  <header><span class="tag">Eq 8</span><h4>Does the energy hop, or slosh?</h4></header>
+  <div class="math">corrected rate = rate ÷ [ 1 + (2ω<sub>J</sub> ÷ γ)² ]</div>
+  <div class="words">if the lamps are strongly coupled and the surroundings are calm,
+    energy sloshes back and forth like a wave instead of hopping one way</div>
+  <p>Energy can move between two molecules in two different ways. Usually the jostling
+  of the surroundings scrambles things so fast that energy simply <strong>hops</strong>
+  across, one way, at random intervals. But if the lamps are strongly connected and the
+  jostling is slow, the energy can instead <strong>slosh</strong> back and forth
+  coherently — wave-like, genuinely quantum behaviour.</p>
+  <p>This equation measures which regime applies. For our sensor the correction comes
+  out at about <strong>five parts in ten thousand</strong>: completely negligible. The
+  energy hops.</p>
+  <p class="why"><b>Why it's here:</b> because it was calculated rather than assumed.
+  Most papers simply assert the simple case. The term is kept in the model because for
+  more tightly coupled pairs it genuinely matters, and then the simple treatment breaks.</p>
+</div>
+
+<h2 id="binding"><span class="n">Equations 9–10</span>Connecting the light to the chemical</h2>
+<p class="lede">So far this is all about two lamps on a spring. Now we attach it to the
+quantity we actually want to know.</p>
+
+<div class="eq">
+  <header><span class="tag">Eq 9</span><h4>What fraction of sensors have caught the target</h4></header>
+  <div class="math">θ = G<sup>h</sup> ÷ (G<sup>h</sup> + K<sub>D</sub><sup>h</sup>)</div>
+  <div class="words">at low concentration almost no sensors are holding the chemical;
+    at high concentration almost all are; K<sub>D</sub> is the halfway point</div>
+  <p>Sensors grab the target chemical and let it go again, constantly. At any instant a
+  certain fraction are holding one. This gives that fraction: an S-shaped curve running
+  from zero to one as the chemical becomes more abundant.</p>
+  <p><strong>K<sub>D</sub> is the single most important design number</strong> — the
+  concentration at which half the sensors are occupied. The curve is steepest there,
+  which means the sensor is most sensitive there. Build a sensor with the wrong
+  K<sub>D</sub> and it will be flat and useless across the range you care about.</p>
+  <p class="why"><b>Why it's here:</b> it is the bridge from chemistry to shape. The
+  paper's sensor-design chart is essentially a hunt for the best K<sub>D</sub>.</p>
+</div>
+
+<div class="eq">
+  <header><span class="tag">Eq 10</span><h4>Averaging over a crowd</h4></header>
+  <div class="math">E(G) = (1 − θ) × E<sub>empty</sub>  +  θ × E<sub>full</sub></div>
+  <div class="words">some sensors are holding the chemical and some are not; what you
+    measure is the blend</div>
+  <p>A cell contains many sensor molecules at once, some empty and some full, each
+  glowing according to its own shape. The measured signal is the weighted blend.</p>
+  <p>There is a subtlety here that is easy to get wrong, and the paper flags it. You must
+  average <strong>the brightnesses</strong>, not <strong>the shapes</strong>. Shape
+  changes take about a thousand times longer than the glowing does, so each molecule
+  glows as whatever shape it is currently in — it does not glow as some half-way
+  average shape. Averaging the shapes first gives a different and <em>incorrect</em>
+  answer.</p>
+  <p class="why"><b>Why it's here:</b> it is the kind of detail that silently biases a
+  result if handled carelessly.</p>
+</div>
+
+<h2 id="drift"><span class="n">Equations 11–13</span>Why the sensor drifts as the cell changes</h2>
+<p class="lede">Here the paper departs from standard practice. These three equations say
+that properties everyone treats as fixed are not fixed at all — they change as the cell
+fills with plastic.</p>
+
+<div class="eq">
+  <header><span class="tag">Eq 11</span><h4>The lamps are too bulky to spin freely</h4></header>
+  <div class="math">κ²<sub>eff</sub> = ⅔ × f<sub>dyn</sub>  +  κ²<sub>static</sub> × (1 − f<sub>dyn</sub>)</div>
+  <div class="words">textbooks assume the lamps tumble freely and alignment averages
+    out; these lamps are too big and too slow for that</div>
+  <p>The standard shortcut assumes the two lamps tumble so fast that alignment averages
+  to a tidy value of ⅔, letting you ignore geometry entirely. That requires tumbling to
+  be fast compared with how long the lamp stays lit.</p>
+  <p>Here it is the other way round. These lamps are barrel-shaped proteins, bulky and
+  slow: they take about <strong>58 billionths of a second</strong> to tumble, while they
+  stay lit for only about <strong>4</strong>. So they are effectively frozen in place
+  while they glow — only about 6.5 % of the averaging happens.</p>
+  <p class="why"><b>Why it's here:</b> using ⅔ anyway is a well-known trap in this
+  field. This equation replaces the assumption with a calculation, and the answer is
+  nowhere near ⅔.</p>
+</div>
+
+<div class="eq">
+  <header><span class="tag">Eq 12</span><h4>And they get slower as the cell thickens</h4></header>
+  <div class="math">tumbling time = (thickness × lamp volume) ÷ (temperature term)</div>
+  <div class="words">spinning in treacle takes longer than spinning in water — and the
+    cytoplasm turns to treacle as granules fill it</div>
+  <p>How long a lamp takes to tumble depends on how thick its surroundings are. As
+  plastic granules accumulate, the inside of the cell becomes progressively more
+  crowded and more viscous, and the lamps tumble more slowly still.</p>
+  <p>The second half of this equation is the thickening law — a standard relationship
+  describing how a fluid becomes more viscous as you suspend more solid particles in it.
+  The same mathematics describes wet concrete.</p>
+  <p class="why"><b>Why it's here:</b> it is the first of two ways the growing plastic
+  reaches back and alters the sensor's calibration.</p>
+</div>
+
+<div class="eq">
+  <header><span class="tag">Eq 13</span><h4>The cell becomes optically denser</h4></header>
+  <div class="math">mix rule:  n blends between n<sub>cytosol</sub> and n<sub>granule</sub> by volume</div>
+  <div class="words">plastic bends light more than cell water does, so as plastic fills
+    the cell the whole interior becomes optically "heavier"</div>
+  <p>Refractive index measures how much a material slows light down. Plastic granules
+  slow it more than the watery interior of a cell. Mix the two and you get a blend —
+  and the blend shifts as the proportion of plastic grows.</p>
+  <p>Now look back at equation 5. The half-way distance R<sub>0</sub> depends on this
+  very number. <strong>So as the cell makes more plastic, the sensor's half-way distance
+  shrinks and transfer efficiency falls — even if the chemical being measured has not
+  changed at all.</strong></p>
+  <p class="why"><b>Why it's here:</b> this is the paper's central reciprocity in one
+  equation. The sensor measures the process; the process alters the sensor.</p>
+</div>
+
+<h2 id="machine"><span class="n">Equations 14–18</span>What the machine actually sees</h2>
+<p class="lede">Everything so far happens inside one molecule. Now the light has to
+travel out through a vat of murky broth and reach a detector — and that journey is
+where the real damage is done.</p>
+
+<div class="eq">
+  <header><span class="tag">Eq 14</span><h4>Two channels, plus some nuisances</h4></header>
+  <div class="math">I<sub>D</sub> = (blue light) × T<sub>D</sub> + background<br>
+  I<sub>A</sub> = (yellow light + leakage + stray excitation) × T<sub>A</sub> + background</div>
+  <div class="words">what the detector records is never purely what you want</div>
+  <p>The instrument watches two colour channels. The blue one is straightforward:
+  whatever the first lamp did not hand over, it glows itself.</p>
+  <p>The yellow channel is messier. It contains the genuine handover signal, plus two
+  contaminants: some of the second lamp gets excited <strong>directly</strong> by the
+  illuminating light without any handover at all, and some blue light <strong>leaks
+  sideways</strong> into the yellow channel because the filters are imperfect. Both are
+  measured once and corrected for.</p>
+  <p>The terms <strong>T<sub>D</sub></strong> and <strong>T<sub>A</sub></strong> are
+  the fraction of each colour that survives the journey out of the vat. Everyone
+  normally assumes they cancel. They do not.</p>
+  <p class="why"><b>Why it's here:</b> it is the honest description of a real
+  measurement rather than an idealised one.</p>
+</div>
+
+<div class="eq">
+  <header><span class="tag">Eq 15</span><h4>The ratio — and the assumption behind it</h4></header>
+  <div class="math">ℛ = yellow channel ÷ blue channel</div>
+  <div class="words">divide one by the other and everything inconvenient is supposed
+    to cancel out</div>
+  <p>This is why the whole field uses ratios. If the lamp dims, both channels dim
+  together and the ratio is unchanged. If there are more cells, both channels brighten
+  together — unchanged. If the detector sits further away — unchanged.</p>
+  <p>It is an elegant trick, and it works for anything that affects both colours
+  equally. <strong>The next three equations are about what happens when something does
+  not.</strong></p>
+  <p class="why"><b>Why it's here:</b> it is the assumption the paper tests, and breaks.</p>
+</div>
+
+<div class="eq">
+  <header><span class="tag">Eq 16</span><h4>How murky the broth is</h4></header>
+  <div class="math">murkiness = a<sub>X</sub> × (ordinary cell material)  +  (a<sub>X</sub> + a<sub>P</sub>) × (plastic)</div>
+  <div class="words">cells make the broth cloudy; plastic granules make it cloudier
+    still, and that extra part is the problem</div>
+  <p>Light leaving a cell has to cross a dense suspension of other cells to reach the
+  detector, and it gets scattered along the way. Two things contribute: ordinary cell
+  material, and the plastic granules.</p>
+  <p>The granules carry an <strong>extra</strong> scattering term, a<sub>P</sub>,
+  because they are dense particles of roughly the same size as the wavelength of light
+  — the ideal size for scattering it. This single term is the villain of the paper.</p>
+  <p class="why"><b>Why it's here:</b> it separates murkiness caused by <em>how many
+  cells</em> there are from murkiness caused by <em>how much plastic is inside
+  them</em> — a distinction that turns out to be decisive.</p>
+</div>
+
+<div class="eq">
+  <header><span class="tag">Eq 17</span><h4>Shorter wavelengths get scattered more</h4></header>
+  <div class="math">T<sub>λ</sub> = exp[ −murkiness × (λ<sub>ref</sub> ÷ λ)<sup>1.5</sup> × path ]</div>
+  <div class="words">this is why the sky is blue and why sunsets are red</div>
+  <p>Two things here. First, light loss is <em>exponential</em> with murkiness and
+  distance — double the murk and you do not lose twice as much, you lose far more.</p>
+  <p>Second, and crucially: the amount lost <strong>depends on colour</strong>. Shorter,
+  bluer wavelengths scatter more than longer, yellower ones. This is exactly why the sky
+  is blue — blue sunlight is scattered sideways across the whole sky — and why the sun
+  looks red at sunset, when its light travels a long path and the blue has been
+  stripped out.</p>
+  <p class="why"><b>Why it's here:</b> everything now follows. Our two channels are
+  different colours, so they are not attenuated equally.</p>
+</div>
+
+<div class="eq key">
+  <header><span class="tag">Eq 18 — the key result</span><h4>The ratio does not cancel after all</h4></header>
+  <div class="math">measured ratio ÷ true ratio  =  T<sub>A</sub> ÷ T<sub>D</sub>  >  1   (always)</div>
+  <div class="words">the blue channel is dimmed more than the yellow one, so the ratio
+    reads high — and gets worse as more plastic accumulates</div>
+  <p>Put equations 15, 16 and 17 together. The blue channel is at a shorter wavelength
+  than the yellow one. Shorter wavelengths scatter more. So <strong>the blue channel
+  loses more light on the way out than the yellow channel does.</strong></p>
+  <p>The ratio is yellow divided by blue. If blue is suppressed more, the ratio comes out
+  <strong>too high</strong> — always, never too low. And the error grows as the cells
+  fill with plastic, because the plastic is what is doing the extra scattering.</p>
+  <p>The practical consequence is unpleasant. The control system reads the inflated
+  ratio and concludes the cells are more starved of nitrogen than they really are. So it
+  feeds them more nitrogen. But nitrogen is precisely what tells cells to stop making
+  plastic and go back to growing. <strong>The measurement error causes the controller to
+  do the opposite of what it should</strong> — and costs about a fifth of the product.</p>
+  <p>Worse, you cannot fix it with a turbidity meter. A turbidity meter tells you how
+  cloudy the broth is, not how much of that cloudiness is plastic — and only the plastic
+  part behaves this way. That number has to come from a model of the fermentation
+  itself, which is the entire reason the two scales must be solved together.</p>
+  <p class="why"><b>In one line:</b> dividing one colour by another cancels everything
+  <b>except colour-dependent effects</b> — and scattering is the most colour-dependent
+  effect there is.</p>
+</div>
+
+<div class="callout">
+<h3>An analogy for equation 18</h3>
+<p>You are judging a race between two runners through thick fog — one in a blue vest,
+one in a yellow vest — by how clearly you can see each of them.</p>
+<p>Fog hides blue more effectively than yellow. So as the fog thickens, the blue runner
+fades faster, and you conclude the yellow runner has pulled ahead. Neither runner has
+changed speed. The fog did.</p>
+<p>Now the twist that makes this paper's version harder: <strong>the runners are
+generating the fog as they run.</strong> The further the race goes, the thicker it gets,
+and the more confidently wrong you become.</p>
+</div>
+
+<h2 id="back"><span class="n">Equations 19–20</span>Working backwards to the answer</h2>
+<p class="lede">Everything above runs forwards: from chemistry, to shape, to light, to
+detector. To actually control anything you need to run it in reverse — from the measured
+number back to the chemical concentration.</p>
+
+<div class="eq">
+  <header><span class="tag">Eq 19</span><h4>Undo the instrument</h4></header>
+  <div class="math">ℛ′ = ℛ × (T<sub>D</sub> ÷ T<sub>A</sub>)   →   solve for transfer efficiency E</div>
+  <div class="words">first remove the scattering distortion, then strip out the leakage
+    and stray-excitation terms</div>
+  <p>Step one is the correction equation 18 demands: multiply the measured ratio by the
+  scattering factor to recover what the ratio <em>would</em> have been without the fog.
+  This is the step that needs the plastic concentration from the fermentation model.</p>
+  <p>Step two is routine algebra — equation 14 run in reverse to strip out the leakage,
+  stray excitation and background, leaving the transfer efficiency.</p>
+  <p class="why"><b>Why it's here:</b> the three versions of the paper's controller
+  differ <em>only</em> in what they put into this one step. One ignores the correction
+  entirely, one corrects for cell density only, one does it properly.</p>
+</div>
+
+<div class="eq">
+  <header><span class="tag">Eq 20</span><h4>From efficiency back to concentration</h4></header>
+  <div class="math">θ = (E − E<sub>empty</sub>) ÷ (E<sub>full</sub> − E<sub>empty</sub>)
+    ;   Ĝ = K<sub>D</sub> × [ θ ÷ (1 − θ) ]<sup>1/h</sup></div>
+  <div class="words">where does this brightness sit between "all sensors empty" and
+    "all sensors full"? — then read the concentration off the binding curve</div>
+  <p>Two short steps. First, equation 10 reversed: given the measured efficiency, what
+  fraction of sensors must be holding the chemical? Second, equation 9 reversed: given
+  that fraction, what concentration produces it?</p>
+  <p>The hat on <strong>Ĝ</strong> is the convention for an <em>estimate</em> rather
+  than the truth. The gap between Ĝ and the real value is what the whole paper is
+  about: trusting the raw ratio makes that gap about <strong>29 %</strong>; doing the
+  correction properly closes it to well under <strong>1 %</strong>.</p>
+  <p class="why"><b>Why it's here:</b> this is the number the controller acts on. Every
+  equation above exists to make this one honest.</p>
+</div>
+
+<hr>
+<p class="foot">The cellular-scale equations (21–36) describe the fermentation itself —
+how cells grow, consume formate, run short of nitrogen and make plastic. They are
+ordinary bookkeeping by comparison: what goes in, what comes out, what is left.</p>
+
+</div>
