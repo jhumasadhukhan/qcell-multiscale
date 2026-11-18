@@ -203,8 +203,14 @@ def fig3_trajectories():
 
     for ax in axs.ravel():
         ax.set_xlabel("time (h)")
-    axs[0, 0].legend(frameon=False, fontsize=6.6, loc="upper left")
-    fig.tight_layout()
+    # One legend for the whole grid, in a reserved strip under the panels.
+    # Inside panel (a) it sat on top of the biomass curve, and there is no
+    # corner of that panel the sigmoid does not pass through.
+    handles, labels = axs[0, 0].get_legend_handles_labels()
+    fig.tight_layout(rect=(0, 0.055, 1, 1))
+    fig.legend(handles, labels, frameon=False, fontsize=6.8, ncol=4,
+               loc="lower center", bbox_to_anchor=(0.5, -0.004),
+               handlelength=1.8, columnspacing=1.6)
     fig.savefig(os.path.join(FIGDIR, "fig3_trajectories.png"))
     plt.close(fig)
 
