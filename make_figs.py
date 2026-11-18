@@ -157,6 +157,12 @@ def fig3_trajectories():
     tr = R["trajectories"]
     fig, axs = plt.subplots(2, 3, figsize=(7.1, 4.2))
     order = ["clock", "closed_raw", "closed_od", "closed_multiscale"]
+    # At nominal granule contrast the OD-corrected and multiscale trajectories
+    # agree to better than 0.31 % of the plotted range in every panel, so a
+    # solid line drawn second erases the first. The upper one is dashed, which
+    # lets the lower show through and makes the agreement itself legible --
+    # that agreement is a result (see Fig. 5a), not an artefact.
+    STYLE = {"closed_multiscale": dict(ls=(0, (4.5, 2.2)), lw=1.45)}
 
     def get(m):
         t = np.array(tr[m]["t"]); y = np.array(tr[m]["y"]); a = np.array(tr[m]["aux"])
@@ -165,25 +171,26 @@ def fig3_trajectories():
     ax = axs[0, 0]
     for m in order:
         t, y, a = get(m)
-        ax.plot(t, y[:, 2], color=C[m], label=LBL[m])
+        ax.plot(t, y[:, 2], color=C[m], label=LBL[m], **STYLE.get(m, {}))
     ax.set_ylabel("$C_X$ (g/L)"); ax.set_title("(a) Biomass")
 
     ax = axs[0, 1]
     for m in order:
         t, y, a = get(m)
-        ax.plot(t, y[:, 3], color=C[m])
+        ax.plot(t, y[:, 3], color=C[m], **STYLE.get(m, {}))
     ax.set_ylabel("$C_P$ (g/L)"); ax.set_title("(b) Polymer")
 
     ax = axs[0, 2]
     for m in order:
         t, y, a = get(m)
-        ax.plot(t, y[:, 8], color=C[m])
+        ax.plot(t, y[:, 8], color=C[m], **STYLE.get(m, {}))
     ax.set_ylabel(r"$\phi_a$"); ax.set_title("(c) Active fraction")
 
     ax = axs[1, 0]
     for m in order:
         t, y, a = get(m)
-        ax.semilogy(t, np.maximum(y[:, 4], 1e-3), color=C[m])
+        ax.semilogy(t, np.maximum(y[:, 4], 1e-3), color=C[m],
+                    **STYLE.get(m, {}))
     ax.axhline(0.16, color=INK, ls=":", lw=1.0)
     ax.set_ylabel("$G$ (mM)"); ax.set_title("(d) 2-oxoglutarate")
 
@@ -191,14 +198,15 @@ def fig3_trajectories():
     for m in order[1:]:
         t, y, a = get(m)
         msk = np.isfinite(a[:, 5]) & (y[:, 4] > 1e-4)
-        ax.plot(t[msk], 100 * (a[msk, 5] - y[msk, 4]) / y[msk, 4], color=C[m])
+        ax.plot(t[msk], 100 * (a[msk, 5] - y[msk, 4]) / y[msk, 4],
+                color=C[m], **STYLE.get(m, {}))
     ax.axhline(0, color=INK, lw=0.8)
     ax.set_ylabel(r"error in $\hat G$ (%)"); ax.set_title("(e) Estimator error")
 
     ax = axs[1, 2]
     for m in order:
         t, y, a = get(m)
-        ax.plot(t, a[:, 0], color=C[m])
+        ax.plot(t, a[:, 0], color=C[m], **STYLE.get(m, {}))
     ax.set_ylabel(r"$\phi_P$"); ax.set_title("(f) Granule loading")
 
     for ax in axs.ravel():
