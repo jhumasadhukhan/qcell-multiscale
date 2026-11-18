@@ -272,11 +272,17 @@ def fig5_design():
     ax.plot(ss[:, 0], ss[:, 7], color=C["closed_multiscale"], marker="^", ms=3,
             label="multiscale")
     ax.axvline(0.12, color=INK, ls=":", lw=1.0)
-    ax.text(0.13, ax.get_ylim()[0] + 0.1, "nominal", fontsize=7, color=INK)
     ax.set_xlabel(r"granule scattering contrast  $a_P$ (L g$^{-1}$cm$^{-1}$)")
     ax.set_ylabel("objective $J$ (g/L)")
     ax.set_title("(a) When the quantum layer is needed")
-    ax.legend(frameon=False, loc="lower left")
+    # The three curves fill the lower left, which is also where the "nominal"
+    # marker has to sit. Open a clear band above them for a one-row legend
+    # instead of letting the two labels share a corner.
+    lo, hi = ax.get_ylim()
+    ax.set_ylim(lo, hi + 0.42 * (hi - lo))
+    ax.legend(frameon=False, loc="upper center", ncol=3, fontsize=6.8,
+              handlelength=1.6, columnspacing=1.3, borderpad=0.2)
+    ax.text(0.13, lo + 0.06 * (hi - lo), "nominal", fontsize=7, color=INK)
 
     dm = R["design_map"]
     KD = np.array(dm["KD"]); Rh = np.array(dm["Rh"]); S = np.array(dm["S"])
@@ -286,7 +292,12 @@ def fig5_design():
     cs = ax.contour(KD, Rh, S, levels=6, colors="w", linewidths=0.5, alpha=0.6)
     ax.clabel(cs, inline=True, fontsize=5.5, fmt="%.2f")
     i, j = np.unravel_index(np.argmax(S), S.shape)
-    ax.plot(KD[j], Rh[i], "*", ms=12, mfc="#ffd166", mec=INK, mew=0.8)
+    ax.plot(KD[j], Rh[i], "*", ms=12, mfc="#ffd166", mec=INK, mew=0.8,
+            clip_on=False, zorder=5)
+    # the optimum sits on the lower edge of the swept range (sensitivity rises
+    # monotonically as R_holo shortens), so without a margin the marker is cut
+    # in half by the axis
+    ax.set_ylim(Rh.min() - 0.35 * (Rh[1] - Rh[0]), Rh.max())
     ax.set_xlabel(r"binding constant $K_D$ (mM)")
     ax.set_ylabel(r"bound-state separation $R_{holo}$ (Å)")
     ax.set_title("(b) Sensor design map")
